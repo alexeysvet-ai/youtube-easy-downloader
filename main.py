@@ -59,15 +59,17 @@ def download_video(url: str) -> str:
     unique_id = uuid.uuid4().hex
 
     ydl_opts = {
-        "format": "best[height<=720]",
-        "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
-        "noplaylist": True,
-        "quiet": True,
-        "retries": 3,
-        "socket_timeout": 30,
-        "nocheckcertificate": True,
+    "format": "best[ext=mp4][height<=480]/best[ext=mp4]/best",
+    "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
+    "noplaylist": True,
+    "quiet": True,
+    "retries": 5,
+    "socket_timeout": 30,
+    "nocheckcertificate": True,
+    "http_headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
     }
-
+}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info)
