@@ -122,6 +122,7 @@ def download_video(url, mode):
     }
 
     ydl_opts = {
+        "http_headers": {"User-Agent": "Mozilla/5.0 Chrome/120 Safari/537.36"},
         "format": fmt_map.get(mode, "best"),
         "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
         "noplaylist": True,
