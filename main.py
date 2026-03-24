@@ -6,6 +6,7 @@ import random
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import yt_dlp
 
 # ===================== CONFIG =====================
@@ -27,13 +28,9 @@ BLACKLIST_FILE = "proxy_blacklist.txt"
 WELCOME_TEXT = (
     "👋 Привет!\n\n"
     "Это простой бот для скачивания видео с YouTube.\n\n"
-    "🚫 Здесь не будет рекламы и навязчивых просьб подписаться.\n\n"
-    "⚠️ Сейчас бот находится в стадии тестирования.\n"
-    "Возможны задержки и ошибки — спасибо за понимание 🙏\n\n"
-    "Просто отправь ссылку на видео 👇\n\n"
-    "Дополнительно:\n"
-    "• <ссылка> 720 — скачать в 720p\n"
-    "• <ссылка> audio — скачать только звук"
+    "🚫 Без рекламы и лишних действий.\n\n"
+    "⚠️ Бот сейчас тестируется, возможны задержки.\n\n"
+    "Просто отправь ссылку 👇"
 )
 
 if not TOKEN:
@@ -42,6 +39,9 @@ if not TOKEN:
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+# временное хранилище
+user_requests = {}
 
 # ===================== LOG =====================
 
@@ -58,9 +58,7 @@ def ensure_file(path):
 def load_proxies():
     ensure_file(PROXY_FILE)
     with open(PROXY_FILE, "r") as f:
-        proxies = [line.strip() for line in f if line.strip()]
-    log(f"[PROXIES LOADED] count={len(proxies)}")
-    return proxies
+        return [line.strip() for line in f if line.strip()]
 
 def load_blacklist():
     ensure_file(BLACKLIST_FILE)
@@ -78,34 +76,15 @@ def add_to_blacklist(proxy):
     with open(BLACKLIST_FILE, "a") as f:
         f.write(proxy + "\n")
 
-    log(f"[BLACKLIST ADDED] {proxy}")
-
 def get_active_proxies():
     proxies = load_proxies()
     blacklist = load_blacklist()
 
     active = [p for p in proxies if p not in blacklist]
-
     result = [None] + active
     random.shuffle(result)
 
-    log(f"[ACTIVE PROXIES] total={len(result)}")
     return result[:5]
-
-# ===================== HEALTH =====================
-
-def self_check():
-    log("[STARTUP] Running checks...")
-
-    if not shutil.which("ffmpeg"):
-        log("[WARNING] ffmpeg not found")
-
-    test_path = f"/tmp/test_{uuid.uuid4().hex}.txt"
-    with open(test_path, "w") as f:
-        f.write("ok")
-    os.remove(test_path)
-
-    log("[STARTUP] Checks passed")
 
 # ===================== DOWNLOAD =====================
 
@@ -122,14 +101,8 @@ def download_video(url: str, mode: str = "360") -> str:
     unique_id = uuid.uuid4().hex
     proxies = get_active_proxies()
 
-    log(f"[DOWNLOAD START] url={url} mode={mode}")
-
-    errors = []
-
-    for idx, proxy in enumerate(proxies):
+    for proxy in proxies:
         try:
-            log(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy}")
-
             if mode == "720":
                 fmt = "best[ext=mp4][height<=720]/best"
             elif mode == "audio":
@@ -141,7 +114,6 @@ def download_video(url: str, mode: str = "360") -> str:
                 "format": fmt,
                 "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
                 "noplaylist": True,
-                "quiet": False,
                 "retries": 1,
                 "fragment_retries": 1,
                 "socket_timeout": 20,
@@ -161,30 +133,16 @@ def download_video(url: str, mode: str = "360") -> str:
             if proxy:
                 ydl_opts["proxy"] = proxy
 
-            log(f"[YTDLP START] proxy={proxy}")
-
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-
-                log(f"[YTDLP SUCCESS] proxy={proxy}")
-
-                filename = ydl.prepare_filename(info)
-                log(f"[FILE SAVED] {filename}")
-
-                return filename
+                return ydl.prepare_filename(info)
 
         except Exception as e:
-            err = str(e)
-            log(f"[ERROR] proxy={proxy} error={err}")
-
-            if proxy and should_blacklist(err):
+            if proxy and should_blacklist(str(e)):
                 add_to_blacklist(proxy)
-
-            errors.append(f"{proxy} -> {err}")
             continue
 
-    log("[ALL PROXIES FAILED]")
-    raise Exception("All proxies failed:\n" + "\n".join(errors))
+    raise Exception("All proxies failed")
 
 async def safe_download(url: str, mode: str) -> str:
     async with semaphore:
@@ -193,36 +151,18 @@ async def safe_download(url: str, mode: str) -> str:
             timeout=DOWNLOAD_TIMEOUT
         )
 
-# ===================== HELPERS =====================
-
-def is_youtube_url(url: str) -> bool:
-    return "youtube.com" in url or "youtu.be" in url
-
-def cleanup_file(path: str):
-    try:
-        if os.path.exists(path):
-            os.remove(path)
-            log(f"[FILE REMOVED] {path}")
-    except Exception as e:
-        log(f"[CLEANUP ERROR] {e}")
-
-def parse_input(text: str):
-    parts = text.strip().split()
-
-    if not parts:
-        return None, "360"
-
-    url = parts[0]
-    mode = "360"
-
-    if len(parts) > 1:
-        arg = parts[1].lower()
-        if arg in ["720", "audio"]:
-            mode = arg
-
-    return url, mode
-
 # ===================== HANDLERS =====================
+
+def quality_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎥 360p", callback_data="q_360"),
+            InlineKeyboardButton(text="🎥 720p", callback_data="q_720"),
+        ],
+        [
+            InlineKeyboardButton(text="🎵 Аудио (mp3)", callback_data="q_audio")
+        ]
+    ])
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
@@ -231,82 +171,73 @@ async def start(message: types.Message):
 @dp.message()
 async def handle_video(message: types.Message):
     if not message.text:
-        await message.answer("Нужна текстовая ссылка")
         return
 
-    url, mode = parse_input(message.text)
-    user_id = message.from_user.id
+    url = message.text.strip()
 
-    if not url:
-        await message.answer("Нужна ссылка")
-        return
-
-    log(f"[REQUEST] user={user_id} url={url} mode={mode}")
-
-    if not is_youtube_url(url):
+    if "youtube.com" not in url and "youtu.be" not in url:
         await message.answer("Это не ссылка на YouTube")
         return
 
-    await message.answer("Скачиваю... ⏳")
+    user_requests[message.from_user.id] = url
+
+    await message.answer(
+        "Выбери формат:",
+        reply_markup=quality_keyboard()
+    )
+
+@dp.callback_query()
+async def handle_quality(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id not in user_requests:
+        await callback.answer("Ссылка устарела", show_alert=True)
+        return
+
+    url = user_requests[user_id]
+
+    mode = callback.data.replace("q_", "")
+
+    await callback.message.edit_text("Скачиваю... ⏳")
 
     file_path = None
 
     try:
         file_path = await safe_download(url, mode)
 
-        if not file_path or not os.path.exists(file_path):
+        if not os.path.exists(file_path):
             raise RuntimeError("Файл не создан")
 
-        size = os.path.getsize(file_path)
-        log(f"[FILE SIZE] {size}")
-
-        if size > MAX_FILE_SIZE:
-            await message.answer("Файл слишком большой (>50MB)")
+        if os.path.getsize(file_path) > MAX_FILE_SIZE:
+            await callback.message.answer("Файл слишком большой (>50MB)")
             return
 
         if mode == "audio":
-            await message.answer_audio(types.FSInputFile(file_path))
+            await callback.message.answer_audio(types.FSInputFile(file_path))
         else:
-            await message.answer_video(types.FSInputFile(file_path))
+            await callback.message.answer_video(types.FSInputFile(file_path))
 
-    except asyncio.TimeoutError:
-        await message.answer("Слишком долго скачивается ⏱")
     except Exception as e:
-        log(f"[FINAL ERROR] {e}")
-        await message.answer("Ошибка при загрузке ❌")
+        log(f"[ERROR] {e}")
+        await callback.message.answer("Ошибка при загрузке ❌")
     finally:
-        if file_path:
-            cleanup_file(file_path)
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
 
-# ===================== WEBHOOK =====================
+# ===================== WEB =====================
 
 async def handle_webhook(request):
-    try:
-        data = await request.json()
-        update = types.Update(**data)
-        await dp.feed_update(bot, update)
-    except Exception as e:
-        log(f"[WEBHOOK ERROR] {e}")
+    data = await request.json()
+    update = types.Update(**data)
+    await dp.feed_update(bot, update)
     return web.Response(text="OK")
-
-# ===================== STARTUP =====================
 
 async def on_startup(app):
-    self_check()
-
     if WEBHOOK_URL:
-        log(f"[WEBHOOK SET] {WEBHOOK_URL}")
         await bot.set_webhook(WEBHOOK_URL)
-    else:
-        log("[WARNING] BASE_URL not set")
-
-# ===================== HEALTH =====================
 
 async def health(request):
-    log("[PING]")
     return web.Response(text="OK")
-
-# ===================== APP =====================
 
 def create_app():
     app = web.Application()
@@ -318,6 +249,5 @@ def create_app():
 # ===================== MAIN =====================
 
 if __name__ == "__main__":
-    log(f"[START] server on port {PORT}")
     app = create_app()
     web.run_app(app, host="0.0.0.0", port=PORT)
