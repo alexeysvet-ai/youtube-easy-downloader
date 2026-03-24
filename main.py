@@ -61,8 +61,8 @@ TEXTS = {
         "en": "Downloading... ⏳"
     },
     "too_big": {
-        "ru": "Файл слишком большой (>50MB)",
-        "en": "File too large (>50MB)"
+        "ru": "⚠️ Файл слишком большой (>50MB).\n\nЭто ограничение Telegram, а не бота.\nПопробуй выбрать более низкое качество или аудио 🙏",
+        "en": "⚠️ File is too large (>50MB).\n\nThis is a Telegram limitation, not the bot.\nTry lower quality or audio 🙏"
     },
     "timeout": {
         "ru": "Слишком долго скачивается ⏱",
@@ -205,10 +205,16 @@ def download_video(url: str, mode: str):
         try:
             if mode == "720":
                 fmt = "best[ext=mp4][height<=720]/best"
+            elif mode == "360":
+                fmt = "best[ext=mp4][height<=360]/best"
+            elif mode == "240":
+                fmt = "best[ext=mp4][height<=240]/best"
+            elif mode == "144":
+                fmt = "best[ext=mp4][height<=144]/best"
             elif mode == "audio":
                 fmt = "bestaudio/best"
             else:
-                fmt = "best[ext=mp4][height<=480]/best"
+                fmt = "best"
 
             ydl_opts = {
                 "format": fmt,
@@ -221,6 +227,13 @@ def download_video(url: str, mode: str):
 
             if proxy:
                 ydl_opts["proxy"] = proxy
+
+            if mode == "audio":
+                ydl_opts["postprocessors"] = [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }]
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
@@ -253,8 +266,12 @@ def lang_keyboard():
 def quality_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🎥 360p", callback_data="q_360"),
             InlineKeyboardButton(text="🎥 720p", callback_data="q_720"),
+            InlineKeyboardButton(text="🎥 360p", callback_data="q_360"),
+        ],
+        [
+            InlineKeyboardButton(text="🎥 240p", callback_data="q_240"),
+            InlineKeyboardButton(text="🎥 144p", callback_data="q_144"),
         ],
         [
             InlineKeyboardButton(text="🎵 Audio", callback_data="q_audio")
