@@ -115,11 +115,11 @@ def should_blacklist(error_text: str) -> bool:
         "forbidden"
     ])
 
-def download_video(url: str) -> str:
+def download_video(url: str, mode: str = "360") -> str:
     unique_id = uuid.uuid4().hex
     proxies = get_active_proxies()
 
-    log(f"[DOWNLOAD START] url={url}")
+    log(f"[DOWNLOAD START] url={url} mode={mode}")
 
     errors = []
 
@@ -127,8 +127,15 @@ def download_video(url: str) -> str:
         try:
             log(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy}")
 
+            if mode == "720":
+                fmt = "best[ext=mp4][height<=720]/best"
+            elif mode == "audio":
+                fmt = "bestaudio/best"
+            else:
+                fmt = "best[ext=mp4][height<=480]/best"
+
             ydl_opts = {
-                "format": "best[ext=mp4][height<=480]/best[ext=mp4]/best",
+                "format": fmt,
                 "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
                 "noplaylist": True,
                 "quiet": False,
@@ -139,6 +146,13 @@ def download_video(url: str) -> str:
                     "User-Agent": "Mozilla/5.0 Chrome/120 Safari/537.36"
                 },
             }
+
+            if mode == "audio":
+                ydl_opts["postprocessors"] = [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }]
 
             if proxy:
                 ydl_opts["proxy"] = proxy
@@ -168,10 +182,10 @@ def download_video(url: str) -> str:
     log("[ALL PROXIES FAILED]")
     raise Exception("All proxies failed:\n" + "\n".join(errors))
 
-async def safe_download(url: str) -> str:
+async def safe_download(url: str, mode: str) -> str:
     async with semaphore:
         return await asyncio.wait_for(
-            asyncio.to_thread(download_video, url),
+            asyncio.to_thread(download_video, url, mode),
             timeout=DOWNLOAD_TIMEOUT
         )
 
@@ -187,6 +201,18 @@ def cleanup_file(path: str):
             log(f"[FILE REMOVED] {path}")
     except Exception as e:
         log(f"[CLEANUP ERROR] {e}")
+
+def parse_input(text: str):
+    parts = text.strip().split()
+    url = parts[0]
+    mode = "360"
+
+    if len(parts) > 1:
+        arg = parts[1].lower()
+        if arg in ["720", "audio"]:
+            mode = arg
+
+    return url, mode
 
 # ===================== HANDLERS =====================
 
@@ -211,10 +237,10 @@ async def handle_video(message: types.Message):
         await message.answer("Нужна текстовая ссылка")
         return
 
-    url = message.text.strip()
+    url, mode = parse_input(message.text)
     user_id = message.from_user.id
 
-    log(f"[REQUEST] user={user_id} url={url}")
+    log(f"[REQUEST] user={user_id} url={url} mode={mode}")
 
     if not is_youtube_url(url):
         await message.answer("Это не ссылка на YouTube")
@@ -225,7 +251,7 @@ async def handle_video(message: types.Message):
     file_path = None
 
     try:
-        file_path = await safe_download(url)
+        file_path = await safe_download(url, mode)
 
         if not file_path or not os.path.exists(file_path):
             raise RuntimeError("Файл не создан")
@@ -237,7 +263,10 @@ async def handle_video(message: types.Message):
             await message.answer("Файл слишком большой (>50MB)")
             return
 
-        await message.answer_video(types.FSInputFile(file_path))
+        if mode == "audio":
+            await message.answer_audio(types.FSInputFile(file_path))
+        else:
+            await message.answer_video(types.FSInputFile(file_path))
 
     except asyncio.TimeoutError:
         await message.answer("Слишком долго скачивается ⏱")
