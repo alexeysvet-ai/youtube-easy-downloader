@@ -28,18 +28,74 @@ MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", 2))
 PROXY_FILE = "proxies.txt"
 BLACKLIST_FILE = "proxy_blacklist.txt"
 
-WELCOME_TEXT = (
-    "👋 Привет!\n\n"
-    "Я бот для скачивания видео и аудио.\n\n"
-    "Поддерживаются:\n"
-    "• YouTube — стабильно\n"
-    "• VK — иногда работает\n"
-    "• Mail.ru — иногда работает\n\n"
-    "⚠️ VK и Mail.ru — дополнительные функции, могут работать нестабильно.\n\n"
-    "🚫 Без рекламы и лишних действий.\n\n"
-    "⚠️ Сейчас тестируемся, возможны задержки.\n\n"
-    "Отправь ссылку 👇"
-)
+# ===================== LANG =====================
+
+user_lang = {}
+
+TEXTS = {
+    "welcome": {
+        "ru": "👋 Привет!\n\nЯ бот для скачивания видео и аудио.\n\n"
+              "• YouTube — стабильно\n"
+              "• VK — иногда работает\n"
+              "• Mail.ru — иногда работает\n\n"
+              "⚠️ VK и Mail.ru — дополнительные функции.\n\n"
+              "Отправь ссылку 👇",
+
+        "en": "👋 Hi!\n\nI download videos and audio.\n\n"
+              "• YouTube — stable\n"
+              "• VK — sometimes works\n"
+              "• Mail.ru — sometimes works\n\n"
+              "⚠️ VK and Mail.ru are experimental.\n\n"
+              "Send a link 👇"
+    },
+    "choose_lang": {
+        "ru": "Выбери язык:",
+        "en": "Choose language:"
+    },
+    "choose_format": {
+        "ru": "Выбери формат:",
+        "en": "Choose format:"
+    },
+    "downloading": {
+        "ru": "Скачиваю... ⏳",
+        "en": "Downloading... ⏳"
+    },
+    "too_big": {
+        "ru": "Файл слишком большой (>50MB)",
+        "en": "File too large (>50MB)"
+    },
+    "timeout": {
+        "ru": "Слишком долго скачивается ⏱",
+        "en": "Download timeout ⏱"
+    },
+    "error": {
+        "ru": "Ошибка при загрузке ❌",
+        "en": "Download error ❌"
+    },
+    "vk_error": {
+        "ru": "⚠️ VK видео нестабильны\nПопробуй другое",
+        "en": "⚠️ VK downloads unstable\nTry another video"
+    },
+    "mail_error": {
+        "ru": "⚠️ Не удалось скачать с Mail.ru\nПопробуй другое или YouTube",
+        "en": "⚠️ Failed to download from Mail.ru\nTry another or YouTube"
+    }
+}
+
+def t(key, user_id):
+    lang = user_lang.get(user_id, "ru")
+    return TEXTS[key][lang]
+
+# ===================== INIT =====================
+
+if not TOKEN:
+    raise ValueError("TOKEN not set")
+
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+user_requests = {}
 
 # ===================== METRICS =====================
 
@@ -54,17 +110,6 @@ def success_rate():
     if metrics["total"] == 0:
         return 0
     return round(metrics["success"] / metrics["total"] * 100, 2)
-
-# ===================== INIT =====================
-
-if not TOKEN:
-    raise ValueError("TOKEN not set")
-
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
-semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
-
-user_requests = {}
 
 # ===================== LOG =====================
 
@@ -107,7 +152,7 @@ def get_active_proxies():
 
     return [None] + active[:5]
 
-# ===================== SERVICE DETECTION =====================
+# ===================== HELPERS =====================
 
 def get_service(url: str) -> str:
     if "youtube.com" in url or "youtu.be" in url:
@@ -119,84 +164,10 @@ def get_service(url: str) -> str:
     else:
         return "other"
 
-# ===================== URL NORMALIZATION =====================
-
 def normalize_url(url: str) -> str:
     if "m.my.mail.ru" in url:
         return url.replace("m.my.mail.ru", "my.mail.ru")
     return url
-
-# ===================== DOWNLOAD =====================
-
-def should_blacklist(error_text: str) -> bool:
-    error_text = error_text.lower()
-    return any(x in error_text for x in [
-        "sign in",
-        "confirm you’re not a bot",
-        "403",
-        "forbidden"
-    ])
-
-def download_video(url: str, mode: str = "360") -> str:
-    unique_id = uuid.uuid4().hex
-    service = get_service(url)
-
-    if service == "youtube":
-        proxies = get_active_proxies()
-    else:
-        proxies = [None]
-
-    for proxy in proxies:
-        try:
-            if mode == "720":
-                fmt = "best[ext=mp4][height<=720]/best"
-            elif mode == "audio":
-                fmt = "bestaudio/best"
-            else:
-                fmt = "best[ext=mp4][height<=480]/best"
-
-            ydl_opts = {
-                "format": fmt,
-                "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
-                "noplaylist": True,
-                "retries": 1,
-                "fragment_retries": 1,
-                "socket_timeout": 20,
-                "nocheckcertificate": True,
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 Chrome/120 Safari/537.36"
-                },
-            }
-
-            if mode == "audio":
-                ydl_opts["postprocessors"] = [{
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }]
-
-            if proxy:
-                ydl_opts["proxy"] = proxy
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                return ydl.prepare_filename(info)
-
-        except Exception as e:
-            if proxy and should_blacklist(str(e)):
-                add_to_blacklist(proxy)
-            continue
-
-    raise Exception("All attempts failed")
-
-async def safe_download(url: str, mode: str) -> str:
-    async with semaphore:
-        return await asyncio.wait_for(
-            asyncio.to_thread(download_video, url, mode),
-            timeout=DOWNLOAD_TIMEOUT
-        )
-
-# ===================== HELPERS =====================
 
 def is_supported_url(url: str) -> bool:
     return any(x in url for x in [
@@ -213,6 +184,72 @@ def cleanup_file(path: str):
     except:
         pass
 
+# ===================== DOWNLOAD =====================
+
+def should_blacklist(error_text: str) -> bool:
+    error_text = error_text.lower()
+    return any(x in error_text for x in [
+        "sign in",
+        "confirm you’re not a bot",
+        "403",
+        "forbidden"
+    ])
+
+def download_video(url: str, mode: str):
+    unique_id = uuid.uuid4().hex
+    service = get_service(url)
+
+    proxies = get_active_proxies() if service == "youtube" else [None]
+
+    for proxy in proxies:
+        try:
+            if mode == "720":
+                fmt = "best[ext=mp4][height<=720]/best"
+            elif mode == "audio":
+                fmt = "bestaudio/best"
+            else:
+                fmt = "best[ext=mp4][height<=480]/best"
+
+            ydl_opts = {
+                "format": fmt,
+                "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
+                "noplaylist": True,
+                "retries": 1,
+                "socket_timeout": 20,
+                "nocheckcertificate": True,
+            }
+
+            if proxy:
+                ydl_opts["proxy"] = proxy
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                return ydl.prepare_filename(info)
+
+        except Exception as e:
+            if proxy and should_blacklist(str(e)):
+                add_to_blacklist(proxy)
+            continue
+
+    raise Exception("fail")
+
+async def safe_download(url, mode):
+    async with semaphore:
+        return await asyncio.wait_for(
+            asyncio.to_thread(download_video, url, mode),
+            timeout=DOWNLOAD_TIMEOUT
+        )
+
+# ===================== UI =====================
+
+def lang_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang_ru"),
+            InlineKeyboardButton(text="🇺🇸 English", callback_data="lang_en"),
+        ]
+    ])
+
 def quality_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -220,7 +257,7 @@ def quality_keyboard():
             InlineKeyboardButton(text="🎥 720p", callback_data="q_720"),
         ],
         [
-            InlineKeyboardButton(text="🎵 Аудио (mp3)", callback_data="q_audio")
+            InlineKeyboardButton(text="🎵 Audio", callback_data="q_audio")
         ]
     ])
 
@@ -228,52 +265,58 @@ def quality_keyboard():
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    await message.answer(WELCOME_TEXT)
+    await message.answer(
+        TEXTS["choose_lang"]["ru"] + " / " + TEXTS["choose_lang"]["en"],
+        reply_markup=lang_keyboard()
+    )
+
+@dp.callback_query(lambda c: c.data.startswith("lang_"))
+async def set_lang(callback: types.CallbackQuery):
+    lang = callback.data.split("_")[1]
+    user_lang[callback.from_user.id] = lang
+
+    await callback.message.edit_text(t("welcome", callback.from_user.id))
 
 @dp.message()
 async def handle_video(message: types.Message):
     if not message.text:
         return
 
+    user_id = message.from_user.id
     url = normalize_url(message.text.strip())
 
     if not is_supported_url(url):
-        await message.answer("Сервис пока не поддерживается")
         return
 
-    user_requests[message.from_user.id] = url
+    user_requests[user_id] = url
 
     await message.answer(
-        "Выбери формат:",
+        t("choose_format", user_id),
         reply_markup=quality_keyboard()
     )
 
-@dp.callback_query()
+@dp.callback_query(lambda c: c.data.startswith("q_"))
 async def handle_quality(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
-    if user_id not in user_requests:
-        await callback.answer("Ссылка устарела", show_alert=True)
+    url = user_requests.get(user_id)
+    if not url:
         return
 
-    url = user_requests[user_id]
     mode = callback.data.replace("q_", "")
 
     metrics["total"] += 1
 
-    await callback.message.edit_text("Скачиваю... ⏳")
+    await callback.message.edit_text(t("downloading", user_id))
 
     file_path = None
 
     try:
         file_path = await safe_download(url, mode)
 
-        if not os.path.exists(file_path):
-            raise RuntimeError("Файл не создан")
-
         if os.path.getsize(file_path) > MAX_FILE_SIZE:
             metrics["fail"] += 1
-            await callback.message.answer("Файл слишком большой (>50MB)")
+            await callback.message.answer(t("too_big", user_id))
             return
 
         if mode == "audio":
@@ -285,25 +328,19 @@ async def handle_quality(callback: types.CallbackQuery):
 
     except asyncio.TimeoutError:
         metrics["timeouts"] += 1
-        await callback.message.answer("Слишком долго скачивается ⏱")
-    except Exception as e:
+        await callback.message.answer(t("timeout", user_id))
+    except Exception:
         metrics["fail"] += 1
-        log(f"[ERROR][BUILD {BUILD_ID}] {e}")
 
         service = get_service(url)
 
-        if service == "mail":
-            await callback.message.answer(
-                "⚠️ Не удалось скачать это видео с Mail.ru\n"
-                "Попробуй другое или YouTube — там стабильнее 🙏"
-            )
-        elif service == "vk":
-            await callback.message.answer(
-                "⚠️ VK видео скачиваются нестабильно\n"
-                "Попробуй другое видео 🙏"
-            )
+        if service == "vk":
+            await callback.message.answer(t("vk_error", user_id))
+        elif service == "mail":
+            await callback.message.answer(t("mail_error", user_id))
         else:
-            await callback.message.answer("Ошибка при загрузке ❌")
+            await callback.message.answer(t("error", user_id))
+
     finally:
         if file_path:
             cleanup_file(file_path)
