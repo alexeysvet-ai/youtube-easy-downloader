@@ -116,6 +116,13 @@ def get_service(url: str) -> str:
     else:
         return "other"
 
+# ===================== URL NORMALIZATION =====================
+
+def normalize_url(url: str) -> str:
+    if "m.my.mail.ru" in url:
+        return url.replace("m.my.mail.ru", "my.mail.ru")
+    return url
+
 # ===================== DOWNLOAD =====================
 
 def should_blacklist(error_text: str) -> bool:
@@ -131,11 +138,10 @@ def download_video(url: str, mode: str = "360") -> str:
     unique_id = uuid.uuid4().hex
     service = get_service(url)
 
-    # 🔥 КЛЮЧЕВАЯ ЛОГИКА
     if service == "youtube":
         proxies = get_active_proxies()
     else:
-        proxies = [None]  # только напрямую
+        proxies = [None]
 
     for proxy in proxies:
         try:
@@ -226,7 +232,7 @@ async def handle_video(message: types.Message):
     if not message.text:
         return
 
-    url = message.text.strip()
+    url = normalize_url(message.text.strip())
 
     if not is_supported_url(url):
         await message.answer("Сервис пока не поддерживается")
@@ -285,8 +291,7 @@ async def handle_quality(callback: types.CallbackQuery):
         if file_path:
             cleanup_file(file_path)
 
-        log(f"[METRICS] total={metrics['total']} success={metrics['success']} fail={metrics['fail']} timeouts={metrics['timeouts']}")
-        log(f"[SUCCESS RATE] {success_rate()}%")
+        log(f"[METRICS] total={metrics['total']} success={metrics['success']} fail={metrics['fail']} timeouts={metrics['timeouts']} rate={success_rate()}%")
 
 # ===================== WEB =====================
 
