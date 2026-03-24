@@ -25,12 +25,12 @@ MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", 2))
 PROXY_FILE = "proxies.txt"
 BLACKLIST_FILE = "proxy_blacklist.txt"
 
-# 🟡 Режим тестирования
-MAINTENANCE_MODE = True
+# 🟡 режим тестирования
+TEST_MODE = False
 
 MAINTENANCE_TEXT = (
     "🚧 Бот скоро заработает\n\n"
-    "Сейчас мы тестируем загрузку видео и улучшаем стабильность.\n"
+    "Сейчас мы тестируем загрузку видео.\n"
     "Попробуйте чуть позже 🙏"
 )
 
@@ -193,9 +193,60 @@ def cleanup_file(path: str):
 async def start(message: types.Message):
     await message.answer(MAINTENANCE_TEXT)
 
+@dp.message(Command("startdownloadtest"))
+async def enable_test_mode(message: types.Message):
+    global TEST_MODE
+    TEST_MODE = True
+    logging.info("[TEST MODE ENABLED]")
+    await message.answer("✅ Тестовый режим включён. Теперь можно отправлять ссылки.")
+
 @dp.message()
 async def handle_video(message: types.Message):
-    await message.answer(MAINTENANCE_TEXT)
+    if not TEST_MODE:
+        await message.answer(MAINTENANCE_TEXT)
+        return
+
+    if not message.text:
+        await message.answer("Нужна текстовая ссылка")
+        return
+
+    url = message.text.strip()
+    user_id = message.from_user.id
+
+    logging.info(f"[REQUEST] user={user_id} url={url}")
+
+    if not is_youtube_url(url):
+        await message.answer("Это не ссылка на YouTube")
+        return
+
+    await message.answer("Скачиваю... ⏳")
+
+    file_path = None
+
+    try:
+        file_path = await safe_download(url)
+
+        if not file_path or not os.path.exists(file_path):
+            raise RuntimeError("Файл не создан")
+
+        size = os.path.getsize(file_path)
+
+        logging.info(f"[FILE SIZE] {size}")
+
+        if size > MAX_FILE_SIZE:
+            await message.answer("Файл слишком большой (>50MB)")
+            return
+
+        await message.answer_video(types.FSInputFile(file_path))
+
+    except asyncio.TimeoutError:
+        await message.answer("Слишком долго скачивается ⏱")
+    except Exception as e:
+        logging.exception(e)
+        await message.answer("Ошибка при загрузке ❌")
+    finally:
+        if file_path:
+            cleanup_file(file_path)
 
 # ===================== WEBHOOK =====================
 
