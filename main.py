@@ -1,6 +1,5 @@
 import os
 import asyncio
-import logging
 import uuid
 import shutil
 import random
@@ -37,24 +36,27 @@ MAINTENANCE_TEXT = (
 if not TOKEN:
     raise ValueError("TOKEN not set")
 
-logging.basicConfig(level=logging.INFO)
-
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+
+# ===================== LOG =====================
+
+def log(msg):
+    print(msg, flush=True)
 
 # ===================== FILE HELPERS =====================
 
 def ensure_file(path):
     if not os.path.exists(path):
         open(path, "w").close()
-        logging.info(f"[FILE CREATED] {path}")
+        log(f"[FILE CREATED] {path}")
 
 def load_proxies():
     ensure_file(PROXY_FILE)
     with open(PROXY_FILE, "r") as f:
         proxies = [line.strip() for line in f if line.strip()]
-    logging.info(f"[PROXIES LOADED] count={len(proxies)}")
+    log(f"[PROXIES LOADED] count={len(proxies)}")
     return proxies
 
 def load_blacklist():
@@ -73,7 +75,7 @@ def add_to_blacklist(proxy):
     with open(BLACKLIST_FILE, "a") as f:
         f.write(proxy + "\n")
 
-    logging.warning(f"[BLACKLIST ADDED] {proxy}")
+    log(f"[BLACKLIST ADDED] {proxy}")
 
 def get_active_proxies():
     proxies = load_proxies()
@@ -84,23 +86,23 @@ def get_active_proxies():
     result = [None] + active
     random.shuffle(result)
 
-    logging.info(f"[ACTIVE PROXIES] total={len(result)}")
+    log(f"[ACTIVE PROXIES] total={len(result)}")
     return result
 
 # ===================== HEALTH =====================
 
 def self_check():
-    logging.info("Running startup checks...")
+    log("[STARTUP] Running checks...")
 
     if not shutil.which("ffmpeg"):
-        logging.warning("ffmpeg not found")
+        log("[WARNING] ffmpeg not found")
 
     test_path = f"/tmp/test_{uuid.uuid4().hex}.txt"
     with open(test_path, "w") as f:
         f.write("ok")
     os.remove(test_path)
 
-    logging.info("Startup checks passed")
+    log("[STARTUP] Checks passed")
 
 # ===================== DOWNLOAD =====================
 
@@ -117,13 +119,13 @@ def download_video(url: str) -> str:
     unique_id = uuid.uuid4().hex
     proxies = get_active_proxies()
 
-    logging.info(f"[DOWNLOAD START] url={url}")
+    log(f"[DOWNLOAD START] url={url}")
 
     errors = []
 
     for idx, proxy in enumerate(proxies):
         try:
-            logging.info(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy}")
+            log(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy}")
 
             ydl_opts = {
                 "format": "best[ext=mp4][height<=480]/best[ext=mp4]/best",
@@ -136,27 +138,26 @@ def download_video(url: str) -> str:
                 "http_headers": {
                     "User-Agent": "Mozilla/5.0 Chrome/120 Safari/537.36"
                 },
-                "logger": logging.getLogger("yt_dlp"),
             }
 
             if proxy:
                 ydl_opts["proxy"] = proxy
 
-            logging.info(f"[YTDLP START] proxy={proxy}")
+            log(f"[YTDLP START] proxy={proxy}")
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
 
-                logging.info(f"[YTDLP SUCCESS] proxy={proxy}")
+                log(f"[YTDLP SUCCESS] proxy={proxy}")
 
                 filename = ydl.prepare_filename(info)
-                logging.info(f"[FILE SAVED] {filename}")
+                log(f"[FILE SAVED] {filename}")
 
                 return filename
 
         except Exception as e:
             err = str(e)
-            logging.error(f"[ERROR] proxy={proxy} error={err}")
+            log(f"[ERROR] proxy={proxy} error={err}")
 
             if proxy and should_blacklist(err):
                 add_to_blacklist(proxy)
@@ -164,7 +165,7 @@ def download_video(url: str) -> str:
             errors.append(f"{proxy} -> {err}")
             continue
 
-    logging.error("[ALL PROXIES FAILED]")
+    log("[ALL PROXIES FAILED]")
     raise Exception("All proxies failed:\n" + "\n".join(errors))
 
 async def safe_download(url: str) -> str:
@@ -183,9 +184,9 @@ def cleanup_file(path: str):
     try:
         if os.path.exists(path):
             os.remove(path)
-            logging.info(f"[FILE REMOVED] {path}")
+            log(f"[FILE REMOVED] {path}")
     except Exception as e:
-        logging.warning(f"Cleanup failed: {e}")
+        log(f"[CLEANUP ERROR] {e}")
 
 # ===================== HANDLERS =====================
 
@@ -197,7 +198,7 @@ async def start(message: types.Message):
 async def enable_test_mode(message: types.Message):
     global TEST_MODE
     TEST_MODE = True
-    logging.info("[TEST MODE ENABLED]")
+    log("[TEST MODE ENABLED]")
     await message.answer("✅ Тестовый режим включён. Теперь можно отправлять ссылки.")
 
 @dp.message()
@@ -213,7 +214,7 @@ async def handle_video(message: types.Message):
     url = message.text.strip()
     user_id = message.from_user.id
 
-    logging.info(f"[REQUEST] user={user_id} url={url}")
+    log(f"[REQUEST] user={user_id} url={url}")
 
     if not is_youtube_url(url):
         await message.answer("Это не ссылка на YouTube")
@@ -230,8 +231,7 @@ async def handle_video(message: types.Message):
             raise RuntimeError("Файл не создан")
 
         size = os.path.getsize(file_path)
-
-        logging.info(f"[FILE SIZE] {size}")
+        log(f"[FILE SIZE] {size}")
 
         if size > MAX_FILE_SIZE:
             await message.answer("Файл слишком большой (>50MB)")
@@ -242,7 +242,7 @@ async def handle_video(message: types.Message):
     except asyncio.TimeoutError:
         await message.answer("Слишком долго скачивается ⏱")
     except Exception as e:
-        logging.exception(e)
+        log(f"[FINAL ERROR] {e}")
         await message.answer("Ошибка при загрузке ❌")
     finally:
         if file_path:
@@ -256,7 +256,7 @@ async def handle_webhook(request):
         update = types.Update(**data)
         await dp.feed_update(bot, update)
     except Exception as e:
-        logging.exception(f"Webhook error: {e}")
+        log(f"[WEBHOOK ERROR] {e}")
     return web.Response(text="OK")
 
 # ===================== STARTUP =====================
@@ -265,10 +265,10 @@ async def on_startup(app):
     self_check()
 
     if WEBHOOK_URL:
-        logging.info(f"Setting webhook: {WEBHOOK_URL}")
+        log(f"[WEBHOOK SET] {WEBHOOK_URL}")
         await bot.set_webhook(WEBHOOK_URL)
     else:
-        logging.warning("BASE_URL not set")
+        log("[WARNING] BASE_URL not set")
 
 # ===================== HEALTH =====================
 
@@ -287,6 +287,6 @@ def create_app():
 # ===================== MAIN =====================
 
 if __name__ == "__main__":
+    log(f"[START] server on port {PORT}")
     app = create_app()
-    logging.info(f"Starting server on port {PORT}")
     web.run_app(app, host="0.0.0.0", port=PORT)
