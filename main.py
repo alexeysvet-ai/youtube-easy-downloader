@@ -29,13 +29,30 @@ WELCOME_TEXT = (
     "👋 Привет!\n\n"
     "Я бот для скачивания видео и аудио.\n\n"
     "Поддерживаются:\n"
-    "• YouTube\n"
-    "• VK\n"
-    "• Mail.ru\n\n"
+    "• YouTube — стабильно\n"
+    "• VK — иногда работает\n"
+    "• Mail.ru — иногда работает\n\n"
+    "⚠️ VK и Mail.ru — дополнительные функции, могут работать нестабильно.\n\n"
     "🚫 Без рекламы и лишних действий.\n\n"
     "⚠️ Сейчас тестируемся, возможны задержки.\n\n"
     "Отправь ссылку 👇"
 )
+
+# ===================== METRICS =====================
+
+metrics = {
+    "total": 0,
+    "success": 0,
+    "fail": 0,
+    "timeouts": 0,
+}
+
+def success_rate():
+    if metrics["total"] == 0:
+        return 0
+    return round(metrics["success"] / metrics["total"] * 100, 2)
+
+# ===================== INIT =====================
 
 if not TOKEN:
     raise ValueError("TOKEN not set")
@@ -83,10 +100,21 @@ def get_active_proxies():
     blacklist = load_blacklist()
 
     active = [p for p in proxies if p not in blacklist]
-    result = [None] + active
-    random.shuffle(result)
+    random.shuffle(active)
 
-    return result[:5]
+    return [None] + active[:5]
+
+# ===================== SERVICE DETECTION =====================
+
+def get_service(url: str) -> str:
+    if "youtube.com" in url or "youtu.be" in url:
+        return "youtube"
+    elif "vk.com" in url:
+        return "vk"
+    elif "mail.ru" in url:
+        return "mail"
+    else:
+        return "other"
 
 # ===================== DOWNLOAD =====================
 
@@ -101,7 +129,13 @@ def should_blacklist(error_text: str) -> bool:
 
 def download_video(url: str, mode: str = "360") -> str:
     unique_id = uuid.uuid4().hex
-    proxies = get_active_proxies()
+    service = get_service(url)
+
+    # 🔥 КЛЮЧЕВАЯ ЛОГИКА
+    if service == "youtube":
+        proxies = get_active_proxies()
+    else:
+        proxies = [None]  # только напрямую
 
     for proxy in proxies:
         try:
@@ -144,7 +178,7 @@ def download_video(url: str, mode: str = "360") -> str:
                 add_to_blacklist(proxy)
             continue
 
-    raise Exception("All proxies failed")
+    raise Exception("All attempts failed")
 
 async def safe_download(url: str, mode: str) -> str:
     async with semaphore:
@@ -160,8 +194,7 @@ def is_supported_url(url: str) -> bool:
         "youtube.com",
         "youtu.be",
         "vk.com",
-        "mail.ru",
-        "rutube.ru"
+        "mail.ru"
     ])
 
 def cleanup_file(path: str):
@@ -217,6 +250,8 @@ async def handle_quality(callback: types.CallbackQuery):
     url = user_requests[user_id]
     mode = callback.data.replace("q_", "")
 
+    metrics["total"] += 1
+
     await callback.message.edit_text("Скачиваю... ⏳")
 
     file_path = None
@@ -228,6 +263,7 @@ async def handle_quality(callback: types.CallbackQuery):
             raise RuntimeError("Файл не создан")
 
         if os.path.getsize(file_path) > MAX_FILE_SIZE:
+            metrics["fail"] += 1
             await callback.message.answer("Файл слишком большой (>50MB)")
             return
 
@@ -236,12 +272,21 @@ async def handle_quality(callback: types.CallbackQuery):
         else:
             await callback.message.answer_video(types.FSInputFile(file_path))
 
+        metrics["success"] += 1
+
+    except asyncio.TimeoutError:
+        metrics["timeouts"] += 1
+        await callback.message.answer("Слишком долго скачивается ⏱")
     except Exception as e:
+        metrics["fail"] += 1
         log(f"[ERROR] {e}")
         await callback.message.answer("Ошибка при загрузке ❌")
     finally:
         if file_path:
             cleanup_file(file_path)
+
+        log(f"[METRICS] total={metrics['total']} success={metrics['success']} fail={metrics['fail']} timeouts={metrics['timeouts']}")
+        log(f"[SUCCESS RATE] {success_rate()}%")
 
 # ===================== WEB =====================
 
