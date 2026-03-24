@@ -18,19 +18,22 @@ WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}" if BASE_URL else None
 
 MAX_FILE_SIZE = 50 * 1024 * 1024
-DOWNLOAD_TIMEOUT = 180
+DOWNLOAD_TIMEOUT = 60
 MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", 2))
 
 PROXY_FILE = "proxies.txt"
 BLACKLIST_FILE = "proxy_blacklist.txt"
 
-# 🟡 режим тестирования
-TEST_MODE = False
-
-MAINTENANCE_TEXT = (
-    "🚧 Бот скоро заработает\n\n"
-    "Сейчас мы тестируем загрузку видео.\n"
-    "Попробуйте чуть позже 🙏"
+WELCOME_TEXT = (
+    "👋 Привет!\n\n"
+    "Это простой бот для скачивания видео с YouTube.\n\n"
+    "🚫 Здесь не будет рекламы и навязчивых просьб подписаться.\n\n"
+    "⚠️ Сейчас бот находится в стадии тестирования.\n"
+    "Возможны задержки и ошибки — спасибо за понимание 🙏\n\n"
+    "Просто отправь ссылку на видео 👇\n\n"
+    "Дополнительно:\n"
+    "• <ссылка> 720 — скачать в 720p\n"
+    "• <ссылка> audio — скачать только звук"
 )
 
 if not TOKEN:
@@ -87,7 +90,7 @@ def get_active_proxies():
     random.shuffle(result)
 
     log(f"[ACTIVE PROXIES] total={len(result)}")
-    return result
+    return result[:5]
 
 # ===================== HEALTH =====================
 
@@ -139,7 +142,8 @@ def download_video(url: str, mode: str = "360") -> str:
                 "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
                 "noplaylist": True,
                 "quiet": False,
-                "retries": 2,
+                "retries": 1,
+                "fragment_retries": 1,
                 "socket_timeout": 20,
                 "nocheckcertificate": True,
                 "http_headers": {
@@ -204,6 +208,10 @@ def cleanup_file(path: str):
 
 def parse_input(text: str):
     parts = text.strip().split()
+
+    if not parts:
+        return None, "360"
+
     url = parts[0]
     mode = "360"
 
@@ -218,27 +226,20 @@ def parse_input(text: str):
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    await message.answer(MAINTENANCE_TEXT)
-
-@dp.message(Command("startdownloadtest"))
-async def enable_test_mode(message: types.Message):
-    global TEST_MODE
-    TEST_MODE = True
-    log("[TEST MODE ENABLED]")
-    await message.answer("✅ Тестовый режим включён. Теперь можно отправлять ссылки.")
+    await message.answer(WELCOME_TEXT)
 
 @dp.message()
 async def handle_video(message: types.Message):
-    if not TEST_MODE:
-        await message.answer(MAINTENANCE_TEXT)
-        return
-
     if not message.text:
         await message.answer("Нужна текстовая ссылка")
         return
 
     url, mode = parse_input(message.text)
     user_id = message.from_user.id
+
+    if not url:
+        await message.answer("Нужна ссылка")
+        return
 
     log(f"[REQUEST] user={user_id} url={url} mode={mode}")
 
@@ -302,6 +303,7 @@ async def on_startup(app):
 # ===================== HEALTH =====================
 
 async def health(request):
+    log("[PING]")
     return web.Response(text="OK")
 
 # ===================== APP =====================
