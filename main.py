@@ -3,6 +3,7 @@ import asyncio
 import uuid
 import shutil
 import random
+from datetime import datetime
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -14,6 +15,8 @@ import yt_dlp
 TOKEN = os.getenv("TOKEN")
 BASE_URL = os.getenv("BASE_URL")
 PORT = int(os.getenv("PORT", 10000))
+
+BUILD_ID = os.getenv("BUILD_ID") or datetime.utcnow().strftime("%Y%m%d-%H%M")
 
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}" if BASE_URL else None
@@ -285,13 +288,27 @@ async def handle_quality(callback: types.CallbackQuery):
         await callback.message.answer("Слишком долго скачивается ⏱")
     except Exception as e:
         metrics["fail"] += 1
-        log(f"[ERROR] {e}")
-        await callback.message.answer("Ошибка при загрузке ❌")
+        log(f"[ERROR][BUILD {BUILD_ID}] {e}")
+
+        service = get_service(url)
+
+        if service == "mail":
+            await callback.message.answer(
+                "⚠️ Не удалось скачать это видео с Mail.ru\n"
+                "Попробуй другое или YouTube — там стабильнее 🙏"
+            )
+        elif service == "vk":
+            await callback.message.answer(
+                "⚠️ VK видео скачиваются нестабильно\n"
+                "Попробуй другое видео 🙏"
+            )
+        else:
+            await callback.message.answer("Ошибка при загрузке ❌")
     finally:
         if file_path:
             cleanup_file(file_path)
 
-        log(f"[METRICS] total={metrics['total']} success={metrics['success']} fail={metrics['fail']} timeouts={metrics['timeouts']} rate={success_rate()}%")
+        log(f"[METRICS][BUILD {BUILD_ID}] total={metrics['total']} success={metrics['success']} fail={metrics['fail']} timeouts={metrics['timeouts']} rate={success_rate()}%")
 
 # ===================== WEB =====================
 
@@ -302,6 +319,7 @@ async def handle_webhook(request):
     return web.Response(text="OK")
 
 async def on_startup(app):
+    log(f"[STARTUP][BUILD {BUILD_ID}]")
     if WEBHOOK_URL:
         await bot.set_webhook(WEBHOOK_URL)
 
