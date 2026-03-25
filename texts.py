@@ -1,7 +1,25 @@
 TEXTS = {
-    "welcome": {
-        "ru": "👋 Привет! Отправь ссылку 👇",
-        "en": "👋 Hi! Send a link 👇"
+"welcome": {
+    "ru": "👋 Привет!\n\n"
+          "Я помогаю скачивать видео и музыку 🎬🎵\n\n"
+          "Поддерживаются:\n"
+          "• YouTube (работает стабильно)\n"
+          "• VK, Mail.ru, OK (как повезёт)\n\n"
+          "Работаю даже при блокировках.\n"
+          "Без рекламы, спама и навязчивых подписок.\n\n"
+          "⚠️ Сейчас бот в тестировании — что-то может не работать.\n\n"
+          "Отправь ссылку 👇",
+
+    "en": "👋 Hi!\n\n"
+          "I help download videos and music 🎬🎵\n\n"
+          "Supported:\n"
+          "• YouTube (stable)\n"
+          "• VK, Mail.ru, OK (best effort)\n\n"
+          "Works even with restrictions.\n"
+          "No ads, spam, or forced subscriptions.\n\n"
+          "⚠️ The bot is in testing — some features may not work.\n\n"
+          "Send a link 👇"
+}
     },
     "choose_lang": {
         "ru": "Выбери язык:",
