@@ -1,39 +1,67 @@
-import logging
-from aiohttp import web, ClientSession
-from aiogram import Bot, Dispatcher, types
+# [BUILD 20260325-PROD-01] RESTORE stable UX (no new logic)
 
-from config import BOT_TOKEN, WEBHOOK_PATH, PORT, WEBHOOK_URL
-from handlers import register
+from aiogram import types, Dispatcher
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-# Настройка логирования
-logging.basicConfig(level=logging.DEBUG)
+from downloader import download_video
+import logger as log
 
-bot = Bot(BOT_TOKEN)
-dp = Dispatcher()
-register(dp)
+req = {}
 
-async def webhook(req):
-    logging.debug("Received webhook request")
-    data = await req.json()
-    update = types.Update(**data)
-    logging.debug(f"Processed update from webhook: {update}")
-    await dp.feed_update(bot, update)
-    return web.Response(text="ok")
+# --- keyboards ---
+def format_kb():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Аудио"), KeyboardButton(text="Видео")]
+        ],
+        resize_keyboard=True
+    )
 
-async def health(req):
-    logging.debug("Health check requested")
-    return web.Response(text="OK")
 
-async def on_startup(app):
-    logging.debug("Bot starting up")
-    if WEBHOOK_URL:
-        await bot.set_webhook(WEBHOOK_URL)
+def register(dp: Dispatcher):
 
-app = web.Application()
-app.router.add_post(WEBHOOK_PATH, webhook)
-app.router.add_get('/health', health)
+    # START
+    @dp.message_handler(commands=["start"])
+    async def start(message: types.Message):
+        await message.answer("Отправь ссылку на видео")
 
-if __name__ == '__main__':
-    logging.debug("Starting bot app")
-    app.on_startup.append(on_startup)
-    web.run_app(app, port=PORT)
+
+    # URL
+    @dp.message_handler(lambda m: m.text and "http" in m.text)
+    async def handle_url(message: types.Message):
+        u = message.from_user.id
+        url = message.text.strip()
+
+        req[u] = url
+
+        log.info(f"[REQUEST] user={u} url={url}")
+
+        await message.answer(
+            "Выбери формат",
+            reply_markup=format_kb()
+        )
+
+
+    # FORMAT
+    @dp.message_handler(lambda m: m.text in ["Аудио", "Видео"])
+    async def handle_format(message: types.Message):
+        u = message.from_user.id
+
+        if u not in req:
+            await message.answer("Сначала пришли ссылку")
+            return
+
+        url = req[u]
+        fmt = "audio" if message.text == "Аудио" else "video"
+
+        log.info(f"[FORMAT] user={u} format={fmt}")
+
+        await message.answer("Скачиваю...")
+
+        try:
+            await download_video(url, fmt, message)
+            log.info(f"[SUCCESS] user={u}")
+
+        except Exception as e:
+            log.error(f"[ERROR] user={u} err={e}")
+            await message.answer("Ошибка при скачивании")
