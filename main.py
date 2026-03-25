@@ -1,11 +1,8 @@
-import os
 from aiohttp import web
 from aiogram import Bot, Dispatcher
-from aiogram.types import ParseMode  # исправленный импорт
 
+from config import BOT_TOKEN, WEBHOOK_PATH, PORT, WEBHOOK_URL
 from handlers import register
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
@@ -22,14 +19,15 @@ async def health(req):
     return web.Response(text="OK")
 
 
-async def start(request):
-    return web.Response(text="Bot is running")
+async def on_startup(app):
+    if WEBHOOK_URL:
+        await bot.set_webhook(WEBHOOK_URL)
 
 
 app = web.Application()
-app.router.add_post("/webhook", webhook)
+app.router.add_post(WEBHOOK_PATH, webhook)
 app.router.add_get("/health", health)
-app.router.add_get("/", start)
+app.on_startup.append(on_startup)
 
 if __name__ == "__main__":
-    web.run_app(app, port=8000)
+    web.run_app(app, port=PORT)
