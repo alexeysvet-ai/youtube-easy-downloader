@@ -9,14 +9,16 @@ import logger as log
 req = {}
 
 # --- keyboards ---
-def format_kb():
+def format_kb(u):
     return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text=t("audio", u)),
+                KeyboardButton(text=t("video", u))
+            ]
+        ],
         resize_keyboard=True
-    ).add(
-        KeyboardButton("Аудио"),
-        KeyboardButton("Видео")
     )
-
 
 def register(dp: Dispatcher):
 
