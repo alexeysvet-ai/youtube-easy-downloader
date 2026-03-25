@@ -1,7 +1,7 @@
 import os
 
 # --- Telegram ---
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("TOKEN")
 WEBHOOK_PATH = "/webhook"
 PORT = int(os.getenv("PORT", 8000))
 
