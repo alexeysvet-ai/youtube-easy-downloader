@@ -1,5 +1,5 @@
 from aiohttp import web
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, types
 
 from config import BOT_TOKEN, WEBHOOK_PATH, PORT, WEBHOOK_URL
 from handlers import register
@@ -10,7 +10,8 @@ register(dp)
 
 async def webhook(req):
     data = await req.json()
-    await dp.feed_update(bot, data)
+    update = types.Update(**data)  # Преобразуем данные в объект Update
+    await dp.feed_update(bot, update)
     return web.Response(text="ok")
 
 async def health(req):
