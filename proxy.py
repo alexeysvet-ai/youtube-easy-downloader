@@ -1,6 +1,7 @@
 import time
+import os
 
-PROXIES = []
+PROXY_FILE = "proxies.txt"
 
 state = {}
 blacklist = {}
@@ -8,13 +9,23 @@ blacklist = {}
 SHORT, MEDIUM, LONG = 10, 60, 300
 
 
+def load_proxies():
+    if not os.path.exists(PROXY_FILE):
+        return []
+
+    with open(PROXY_FILE, "r") as f:
+        lines = [l.strip() for l in f.readlines()]
+
+    return [l for l in lines if l]
+
+
 def score(p):
     s = state.get(p, {"s": 0, "f": 0})
     return s["s"] - s["f"]
 
 
-def sorted_proxies():
-    return sorted(PROXIES, key=score, reverse=True)
+def sorted_proxies(proxies):
+    return sorted(proxies, key=score, reverse=True)
 
 
 def is_bad(p):
@@ -33,12 +44,17 @@ def mark_fail(p):
 
 def ban(p, err):
     ttl = SHORT
-    if "403" in err:
+    e = err.lower()
+
+    if "403" in e:
         ttl = MEDIUM
-    if "sign" in err:
+    if "sign" in e:
         ttl = LONG
+
     blacklist[p] = time.time() + ttl
 
 
 def get():
-    return [p for p in sorted_proxies() if not is_bad(p)]
+    proxies = load_proxies()
+    proxies = sorted_proxies(proxies)
+    return [p for p in proxies if not is_bad(p)]
