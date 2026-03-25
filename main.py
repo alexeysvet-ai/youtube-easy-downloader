@@ -1,5 +1,4 @@
-# Youtube Easy Downloader — main.py (Canvas version)
-# UX: separate status messages (no edit), no duplicate error messages
+# Youtube Easy Downloader — main.py (PROXY SCORING VERSION)
 
 import os
 import asyncio
@@ -47,64 +46,48 @@ semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOWNLOADS)
 user_lang = {}
 user_requests = {}
 
-# ===================== TEXTS =====================
-
-TEXTS = {
-    "welcome": {"ru": "👋 Привет! Отправь ссылку 👇", "en": "👋 Hi! Send a link 👇"},
-    "choose_lang": {"ru": "Выбери язык:", "en": "Choose language:"},
-    "choose_format": {"ru": "Выбери формат:", "en": "Choose format:"},
-
-    "start": {
-        "ru": "🔍 Начинаю обработку...",
-        "en": "🔍 Starting..."
-    },
-
-    "status_1": {
-        "ru": "🌐 Подбираю рабочий прокси...",
-        "en": "🌐 Selecting proxy..."
-    },
-    "status_2": {
-        "ru": "🛡 Обхожу ограничения YouTube...",
-        "en": "🛡 Bypassing restrictions..."
-    },
-    "status_3": {
-        "ru": "⬇️ Загружаю видео...",
-        "en": "⬇️ Downloading..."
-    },
-
-    "success": {
-        "ru": "✅ Готово!",
-        "en": "✅ Done!"
-    },
-
-    "too_big": {
-        "ru": "⚠️ Видео слишком большое (>50MB)\n\nЭто ограничение Telegram\n\nСсылка:\n",
-        "en": "⚠️ File too large (>50MB)\n\nTelegram limitation\n\nLink:\n"
-    },
-
-    "error": {
-        "ru": "😔 К сожалению, сейчас не удалось скачать видео.\n\n"
-              "Я попробовал несколько способов, но сервис временно блокирует загрузку.\n\n"
-              "Попробуй чуть позже 🙏",
-        "en": "😔 Failed to download.\n\nTry again later 🙏"
-    }
-}
-
-def t(key, user_id):
-    return TEXTS[key][user_lang.get(user_id, "ru")]
-
 # ===================== LOG =====================
 
 def log(msg):
     print(msg, flush=True)
 
-# ===================== FILE =====================
+# ===================== PROXY SCORING =====================
 
-def ensure_file(path):
+proxy_stats = {}
+
+def record_success(proxy):
+    if not proxy:
+        return
+    stat = proxy_stats.setdefault(proxy, {"ok": 0, "fail": 0})
+    stat["ok"] += 1
+
+def record_fail(proxy):
+    if not proxy:
+        return
+    stat = proxy_stats.setdefault(proxy, {"ok": 0, "fail": 0})
+    stat["fail"] += 1
+
+def proxy_score(proxy):
+    stat = proxy_stats.get(proxy)
+    if not stat:
+        return 0
+    return stat["ok"] - stat["fail"]
+    def ensure_file(path):
     if not os.path.exists(path):
         open(path, "w").close()
 
-# ===================== PROXY =====================
+
+def normalize_proxy(proxy: str) -> str:
+    if not proxy:
+        return None
+
+    proxy = proxy.strip()
+
+    if proxy.startswith("http://") or proxy.startswith("https://"):
+        return proxy
+
+    return f"http://{proxy}"
+
 
 def load_blacklist():
     ensure_file(BLACKLIST_FILE)
@@ -147,8 +130,16 @@ def add_to_blacklist(proxy, error_text):
 
 def load_proxies():
     ensure_file(PROXY_FILE)
+
+    proxies = []
     with open(PROXY_FILE) as f:
-        return [x.strip() for x in f if x.strip()]
+        for line in f:
+            p = line.strip()
+            if not p:
+                continue
+            proxies.append(normalize_proxy(p))
+
+    return proxies
 
 
 def get_active_proxies():
@@ -157,13 +148,11 @@ def get_active_proxies():
     now = time.time()
 
     active = [p for p in proxies if p not in bl or bl[p] < now]
-    random.shuffle(active)
 
-    # try direct first
-    return [None] + active[:5]
+    # 🔥 СОРТИРОВКА ВМЕСТО RANDOM
+    active.sort(key=lambda p: proxy_score(p), reverse=True)
 
-# ===================== DOWNLOAD =====================
-
+    return active[:5]  # ❗ убрали direct
 def download_video(url, mode):
     unique_id = uuid.uuid4().hex
     proxies = get_active_proxies()
@@ -187,154 +176,40 @@ def download_video(url, mode):
                 "retries": 2,
                 "socket_timeout": 20,
                 "nocheckcertificate": True,
+                "proxy": proxy,
+                "force_ipv4": True,
                 "http_headers": {
                     "User-Agent": "Mozilla/5.0 Chrome/120 Safari/537.36"
                 },
             }
 
-            if proxy:
-                ydl_opts["proxy"] = proxy
+            # 🔥 КЛЮЧЕВАЯ ПРОВЕРКА
+            log(f"[PROXY USED] {proxy}")
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 filename = ydl.prepare_filename(info)
+
+                record_success(proxy)
+                log(f"[SUCCESS] proxy={proxy} score={proxy_score(proxy)}")
+
                 return filename
 
         except Exception as e:
             err = str(e)
-            log(f"[ERROR] proxy={proxy} error={err}")
+
+            record_fail(proxy)
+            log(f"[ERROR] proxy={proxy} score={proxy_score(proxy)} error={err}")
+
             if proxy:
                 add_to_blacklist(proxy, err)
+
             continue
 
     raise Exception("All attempts failed")
-
-
-async def safe_download(url, mode):
+    async def safe_download(url, mode):
     async with semaphore:
         return await asyncio.wait_for(
             asyncio.to_thread(download_video, url, mode),
             timeout=DOWNLOAD_TIMEOUT
         )
-
-# ===================== UI =====================
-
-def lang_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🇷🇺", callback_data="lang_ru"),
-         InlineKeyboardButton(text="🇺🇸", callback_data="lang_en")]
-    ])
-
-
-def quality_keyboard():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="720p", callback_data="q_720"),
-         InlineKeyboardButton(text="360p", callback_data="q_360")],
-        [InlineKeyboardButton(text="240p", callback_data="q_240"),
-         InlineKeyboardButton(text="144p", callback_data="q_144")],
-        [InlineKeyboardButton(text="Audio", callback_data="q_audio")]
-    ])
-
-# ===================== HANDLERS =====================
-
-@dp.message(Command("start"))
-async def start(message: types.Message):
-    await message.answer(
-        TEXTS["choose_lang"]["ru"] + " / " + TEXTS["choose_lang"]["en"],
-        reply_markup=lang_keyboard()
-    )
-
-
-@dp.callback_query(lambda c: c.data.startswith("lang_"))
-async def set_lang(callback: types.CallbackQuery):
-    user_lang[callback.from_user.id] = callback.data.split("_")[1]
-    await callback.message.edit_text(t("welcome", callback.from_user.id))
-
-
-@dp.message()
-async def handle_video(message: types.Message):
-    user_id = message.from_user.id
-    url = (message.text or "").strip()
-
-    user_requests[user_id] = url
-    await message.answer(t("choose_format", user_id), reply_markup=quality_keyboard())
-
-
-@dp.callback_query(lambda c: c.data.startswith("q_"))
-async def handle_quality(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    url = user_requests.get(user_id)
-    mode = callback.data.split("_")[1]
-
-    # Start message
-    await callback.message.answer(t("start", user_id))
-
-    # Progress messages (no edit, separate messages)
-    await callback.message.answer(t("status_1", user_id))
-    await asyncio.sleep(1)
-    await callback.message.answer(t("status_2", user_id))
-    await asyncio.sleep(1)
-    await callback.message.answer(t("status_3", user_id))
-
-    file_path = None
-
-    try:
-        file_path = await safe_download(url, mode)
-
-        if not file_path or not os.path.exists(file_path):
-            raise RuntimeError("File not created")
-
-        size = os.path.getsize(file_path)
-        log(f"[FILE SIZE] {size}")
-
-        if size > MAX_FILE_SIZE:
-            await callback.message.answer(t("too_big", user_id) + url)
-            return
-
-        # Final success message (single, no duplicates)
-        await callback.message.answer(t("success", user_id))
-
-        if mode == "audio":
-            await callback.message.answer_audio(types.FSInputFile(file_path))
-        else:
-            await callback.message.answer_video(types.FSInputFile(file_path))
-
-    except asyncio.TimeoutError:
-        await callback.message.answer(t("error", user_id))
-    except Exception as e:
-        log(f"[FINAL ERROR] {e}")
-        await callback.message.answer(t("error", user_id))
-    finally:
-        if file_path and os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception as e:
-                log(f"[CLEANUP ERROR] {e}")
-
-# ===================== WEB =====================
-
-async def handle_webhook(request):
-    try:
-        data = await request.json()
-        update = types.Update(**data)
-        await dp.feed_update(bot, update)
-    except Exception as e:
-        log(f"[WEBHOOK ERROR] {e}")
-    return web.Response(text="OK")
-
-
-async def on_startup(app):
-    if WEBHOOK_URL:
-        await bot.set_webhook(WEBHOOK_URL)
-
-
-def create_app():
-    app = web.Application()
-    app.router.add_post(WEBHOOK_PATH, handle_webhook)
-    app.router.add_get("/", lambda r: web.Response(text="OK"))
-    app.on_startup.append(on_startup)
-    return app
-
-
-if __name__ == "__main__":
-    web.run_app(create_app(), host="0.0.0.0", port=PORT)
