@@ -8,6 +8,9 @@ def download_video(url, mode):
     unique_id = uuid.uuid4().hex
     proxies = get_active_proxies()
 
+    if not proxies:
+        raise Exception("No proxies available")
+
     fmt_map = {
         "720": "best[height<=720]",
         "360": "best[height<=360]",
@@ -27,12 +30,21 @@ def download_video(url, mode):
                 "retries": 2,
                 "socket_timeout": 20,
                 "nocheckcertificate": True,
-                "proxy": proxy,
                 "force_ipv4": True,
                 "http_headers": {
                     "User-Agent": "Mozilla/5.0 Chrome/120 Safari/537.36"
                 },
+
+                # 🔥 ВАЖНО: улучшение обхода YouTube
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["android", "web"]
+                    }
+                },
             }
+
+            if proxy:
+                ydl_opts["proxy"] = proxy
 
             log(f"[PROXY USED] {proxy}")
 
