@@ -14,12 +14,8 @@ semaphore = asyncio.Semaphore(1)
 user_lang = {}
 user_requests = {}
 
-# ===================== HELPERS =====================
-
 def t(key, user_id):
     return TEXTS[key][user_lang.get(user_id, "ru")]
-
-# ===================== UI =====================
 
 def lang_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -36,16 +32,12 @@ def quality_keyboard():
         [InlineKeyboardButton(text="Audio", callback_data="q_audio")]
     ])
 
-# ===================== DOWNLOAD =====================
-
 async def safe_download(url, mode):
     async with semaphore:
         return await asyncio.wait_for(
             asyncio.to_thread(download_video, url, mode),
             timeout=DOWNLOAD_TIMEOUT
         )
-
-# ===================== HANDLERS =====================
 
 def register_handlers(dp: Dispatcher):
 
@@ -76,14 +68,13 @@ def register_handlers(dp: Dispatcher):
             reply_markup=quality_keyboard()
         )
 
-    # 🔥 ВАЖНО: быстрый ответ + фоновая задача
     @dp.callback_query(lambda c: c.data.startswith("q_"))
     async def handle_quality(callback: types.CallbackQuery):
         user_id = callback.from_user.id
         url = user_requests.get(user_id)
         mode = callback.data.split("_")[1]
 
-        await callback.answer()  # мгновенный ответ Telegram
+        await callback.answer()
 
         asyncio.create_task(process_download(callback, user_id, url, mode))
 
@@ -97,8 +88,10 @@ async def process_download(callback, user_id, url, mode):
     await asyncio.sleep(1)
     await callback.message.answer(t("status_3", user_id))
 
+    file_path = None
+
     try:
-        file_path = await safe_download(url, mode)
+        file_path, info = await safe_download(url, mode)
 
         if not file_path or not os.path.exists(file_path):
             raise RuntimeError("File not created")
@@ -109,7 +102,21 @@ async def process_download(callback, user_id, url, mode):
             await callback.message.answer(t("too_big", user_id) + url)
             return
 
-        await callback.message.answer(t("success", user_id))
+        # 🔥 Формируем инфо
+        title = info.get("title", "Unknown")
+        ext = info.get("ext", "")
+        abr = info.get("abr")  # bitrate audio
+
+        size_mb = round(size / (1024 * 1024), 2)
+
+        info_text = f"📄 {title}\n"
+        info_text += f"📦 {ext.upper()} | {size_mb} MB"
+
+        if mode == "audio" and abr:
+            info_text += f" | {int(abr)} kbps"
+
+        # Финальное сообщение
+        await callback.message.answer(t("success", user_id) + "\n\n" + info_text)
 
         if mode == "audio":
             await callback.message.answer_audio(types.FSInputFile(file_path))
@@ -121,7 +128,7 @@ async def process_download(callback, user_id, url, mode):
         await callback.message.answer(t("error", user_id))
 
     finally:
-        if 'file_path' in locals() and file_path and os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except Exception as e:
