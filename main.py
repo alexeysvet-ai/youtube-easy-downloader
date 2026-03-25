@@ -1,13 +1,8 @@
-
 from aiohttp import web
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
 
 from config import BOT_TOKEN, WEBHOOK_PATH, PORT, WEBHOOK_URL
 from handlers import register
-
-# Check if the BOT_TOKEN is set
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN not set")
 
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
@@ -26,8 +21,9 @@ async def on_startup(app):
         await bot.set_webhook(WEBHOOK_URL)
 
 app = web.Application()
-app.on_startup.append(on_startup)
 app.router.add_post(WEBHOOK_PATH, webhook)
 app.router.add_get('/health', health)
 
-web.run_app(app, port=PORT)
+if __name__ == '__main__':
+    app.on_startup.append(on_startup)
+    web.run_app(app, port=PORT)
