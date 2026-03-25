@@ -1,31 +1,37 @@
 import time
-import os
-
-PROXY_FILE = "proxies.txt"
+from config import PROXY_FILE, BLACKLIST_FILE, TTL_SHORT, TTL_MEDIUM, TTL_LONG
+from utils import ensure_file
 
 state = {}
 blacklist = {}
 
-SHORT, MEDIUM, LONG = 10, 60, 300
-
 
 def load_proxies():
-    if not os.path.exists(PROXY_FILE):
-        return []
+    ensure_file(PROXY_FILE)
+    with open(PROXY_FILE) as f:
+        return [l.strip() for l in f if l.strip()]
 
-    with open(PROXY_FILE, "r") as f:
-        lines = [l.strip() for l in f.readlines()]
 
-    return [l for l in lines if l]
+def load_blacklist():
+    ensure_file(BLACKLIST_FILE)
+    with open(BLACKLIST_FILE) as f:
+        for line in f:
+            try:
+                p, ts = line.strip().split("|")
+                blacklist[p] = float(ts)
+            except:
+                continue
+
+
+def save_blacklist():
+    with open(BLACKLIST_FILE, "w") as f:
+        for p, ts in blacklist.items():
+            f.write(f"{p}|{ts}\n")
 
 
 def score(p):
     s = state.get(p, {"s": 0, "f": 0})
     return s["s"] - s["f"]
-
-
-def sorted_proxies(proxies):
-    return sorted(proxies, key=score, reverse=True)
 
 
 def is_bad(p):
@@ -43,18 +49,19 @@ def mark_fail(p):
 
 
 def ban(p, err):
-    ttl = SHORT
     e = err.lower()
-
+    ttl = TTL_SHORT
     if "403" in e:
-        ttl = MEDIUM
+        ttl = TTL_MEDIUM
     if "sign" in e:
-        ttl = LONG
+        ttl = TTL_LONG
 
     blacklist[p] = time.time() + ttl
+    save_blacklist()
 
 
 def get():
+    load_blacklist()
     proxies = load_proxies()
-    proxies = sorted_proxies(proxies)
+    proxies = sorted(proxies, key=score, reverse=True)
     return [p for p in proxies if not is_bad(p)]
