@@ -1,67 +1,56 @@
-# [BUILD 20260325-PROD-01] RESTORE stable UX (no new logic)
+# [BUILD 20260326-PROD-07] STABLE MAIN (Render + aiogram webhook)
 
-from aiogram import types, Dispatcher
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+import os
+import logging
+from aiohttp import web
+from aiogram import Bot, Dispatcher, types
 
-from downloader import download_video
-import logger as log
+from config import BOT_TOKEN, WEBHOOK_PATH
+from handlers import register
 
-req = {}
+# --- logging ---
+logging.basicConfig(level=logging.INFO)
 
-# --- keyboards ---
-def format_kb():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Аудио"), KeyboardButton(text="Видео")]
-        ],
-        resize_keyboard=True
-    )
+# --- bot / dispatcher ---
+bot = Bot(BOT_TOKEN)
+dp = Dispatcher()
 
-
-def register(dp: Dispatcher):
-
-    # START
-    @dp.message_handler(commands=["start"])
-    async def start(message: types.Message):
-        await message.answer("Отправь ссылку на видео")
+# --- register handlers ---
+register(dp)
 
 
-    # URL
-    @dp.message_handler(lambda m: m.text and "http" in m.text)
-    async def handle_url(message: types.Message):
-        u = message.from_user.id
-        url = message.text.strip()
+# --- webhook handler ---
+async def webhook(request: web.Request):
+    try:
+        data = await request.json()
+        update = types.Update(**data)
 
-        req[u] = url
+        logging.info("Received update")
 
-        log.info(f"[REQUEST] user={u} url={url}")
+        await dp.feed_update(bot, update)
 
-        await message.answer(
-            "Выбери формат",
-            reply_markup=format_kb()
-        )
+        return web.Response(text="ok")
+
+    except Exception as e:
+        logging.exception(f"Webhook error: {e}")
+        return web.Response(text="error", status=500)
 
 
-    # FORMAT
-    @dp.message_handler(lambda m: m.text in ["Аудио", "Видео"])
-    async def handle_format(message: types.Message):
-        u = message.from_user.id
+# --- health check ---
+async def health(request: web.Request):
+    return web.Response(text="OK")
 
-        if u not in req:
-            await message.answer("Сначала пришли ссылку")
-            return
 
-        url = req[u]
-        fmt = "audio" if message.text == "Аудио" else "video"
+# --- app setup ---
+app = web.Application()
+app.router.add_post(WEBHOOK_PATH, webhook)
+app.router.add_get("/health", health)
 
-        log.info(f"[FORMAT] user={u} format={fmt}")
 
-        await message.answer("Скачиваю...")
+# --- startup ---
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
 
-        try:
-            await download_video(url, fmt, message)
-            log.info(f"[SUCCESS] user={u}")
+    logging.info(f"Starting app on port {port}")
 
-        except Exception as e:
-            log.error(f"[ERROR] user={u} err={e}")
-            await message.answer("Ошибка при скачивании")
+    web.run_app(app, port=port)
