@@ -96,4 +96,4 @@ def get_active_proxies():
 
     active.sort(key=lambda p: proxy_score(p), reverse=True)
 
-    return active[:5]
+    return active[:20]
