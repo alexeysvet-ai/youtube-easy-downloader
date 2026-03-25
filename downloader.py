@@ -12,10 +12,10 @@ def download_video(url, mode):
         raise Exception("No proxies available")
 
     fmt_map = {
-        "720": "best[height<=720]",
-        "360": "best[height<=360]",
-        "240": "best[height<=240]",
-        "144": "best[height<=144]",
+        "720": "bestvideo[height<=720]+bestaudio/best",
+        "360": "bestvideo[height<=360]+bestaudio/best",
+        "240": "bestvideo[height<=240]+bestaudio/best",
+        "144": "bestvideo[height<=144]+bestaudio/best",
         "audio": "bestaudio/best"
     }
 
@@ -23,8 +23,12 @@ def download_video(url, mode):
         try:
             log(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy}")
 
+            # 🔥 fallback формат (если основной не сработает)
+            format_string = fmt_map.get(mode, "best")
+            format_with_fallback = f"{format_string}/best"
+
             ydl_opts = {
-                "format": fmt_map.get(mode, "best"),
+                "format": format_with_fallback,
                 "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
                 "noplaylist": True,
                 "retries": 2,
@@ -34,8 +38,6 @@ def download_video(url, mode):
                 "http_headers": {
                     "User-Agent": "Mozilla/5.0 Chrome/120 Safari/537.36"
                 },
-
-                # 🔥 ВАЖНО: улучшение обхода YouTube
                 "extractor_args": {
                     "youtube": {
                         "player_client": ["android", "web"]
