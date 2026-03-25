@@ -1,72 +1,47 @@
-import uuid
+import time
 import yt_dlp
 
-from proxy import get_active_proxies, record_success, record_fail, proxy_score, add_to_blacklist
-from utils import log
+from proxy import get, mark_ok, mark_fail, ban
+import logger as log
 
-def download_video(url, mode):
-    unique_id = uuid.uuid4().hex
-    proxies = get_active_proxies()
+MAX = 10
 
-    if not proxies:
-        raise Exception("No proxies available")
 
-    fmt_map = {
-        "720": "bestvideo[height<=720]+bestaudio/best",
-        "360": "bestvideo[height<=360]+bestaudio/best",
-        "240": "bestvideo[height<=240]+bestaudio/best",
-        "144": "bestvideo[height<=144]+bestaudio/best",
-        "audio": "bestaudio/best"
-    }
+def download_video(url, mode, user):
+    proxies = get()
 
-    for idx, proxy in enumerate(proxies):
+    for i, p in enumerate(proxies[:MAX], 1):
         try:
-            log(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy}")
+            log.try_p(user, i, MAX, p)
 
-            format_string = fmt_map.get(mode, "best")
-            format_with_fallback = f"{format_string}/best"
-
-            ydl_opts = {
-                "format": format_with_fallback,
-                "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
-                "noplaylist": True,
-                "retries": 2,
-                "socket_timeout": 20,
-                "nocheckcertificate": True,
-                "force_ipv4": True,
-                "http_headers": {
-                    "User-Agent": "Mozilla/5.0 Chrome/120 Safari/537.36"
-                },
-                "extractor_args": {
-                    "youtube": {
-                        "player_client": ["android", "web"]
-                    }
-                },
+            opts = {
+                "format": "bestaudio/best" if mode == "audio" else "best",
+                "proxy": p,
+                "quiet": True,
+                "socket_timeout": 10,
+                "outtmpl": "/tmp/%(title)s.%(ext)s",
             }
 
-            if proxy:
-                ydl_opts["proxy"] = proxy
+            t0 = time.time()
 
-            log(f"[PROXY USED] {proxy}")
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
 
-                record_success(proxy)
-                log(f"[SUCCESS] proxy={proxy} score={proxy_score(proxy)}")
+            path = ydl.prepare_filename(info)
 
-                return filename, info
+            dt = time.time() - t0
+            size = round(info.get("filesize", 0) / (1024 * 1024), 2)
+
+            mark_ok(p)
+            log.proxy_used(user, p)
+            log.success(user, p, size, dt)
+
+            return path, info
 
         except Exception as e:
             err = str(e)
-
-            record_fail(proxy)
-            log(f"[ERROR] proxy={proxy} score={proxy_score(proxy)} error={err}")
-
-            if proxy:
-                add_to_blacklist(proxy, err)
-
-            continue
+            mark_fail(p)
+            ban(p, err)
+            log.error(user, p, "YOUTUBE", err)
 
     raise Exception("All attempts failed")
