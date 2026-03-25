@@ -9,13 +9,10 @@ import logger as log
 req = {}
 
 # --- keyboards ---
-def format_kb(u):
+def format_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [
-                KeyboardButton(text=t("audio", u)),
-                KeyboardButton(text=t("video", u))
-            ]
+            [KeyboardButton(text="Аудио"), KeyboardButton(text="Видео")]
         ],
         resize_keyboard=True
     )
@@ -58,7 +55,10 @@ def register(dp: Dispatcher):
 
         log.info(f"[FORMAT] user={user_id} format={fmt}")
 
-        await message.answer("Скачиваю...")
+         await message.answer(
+            t("choose_format", user_id),
+            reply_markup=format_kb()
+         )        
 
         try:
             await download_video(url, fmt, message)
