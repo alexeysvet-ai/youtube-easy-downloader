@@ -72,7 +72,8 @@ def proxy_score(proxy):
     if not stat:
         return 0
     return stat["ok"] - stat["fail"]
-    def ensure_file(path):
+
+def ensure_file(path):
     if not os.path.exists(path):
         open(path, "w").close()
 
