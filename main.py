@@ -50,12 +50,25 @@ TEXTS = {
     "welcome": {"ru": "👋 Привет! Отправь ссылку 👇", "en": "👋 Hi! Send a link 👇"},
     "choose_lang": {"ru": "Выбери язык:", "en": "Choose language:"},
     "choose_format": {"ru": "Выбери формат:", "en": "Choose format:"},
-    "downloading": {"ru": "Скачиваю... ⏳", "en": "Downloading... ⏳"},
+
+    "status_1": {"ru": "🔍 Анализирую ссылку...", "en": "🔍 Analyzing link..."},
+    "status_2": {"ru": "🌐 Подбираю рабочий прокси...", "en": "🌐 Selecting proxy..."},
+    "status_3": {"ru": "🛡 Обхожу ограничения YouTube...", "en": "🛡 Bypassing restrictions..."},
+    "status_4": {"ru": "⬇️ Загружаю видео...", "en": "⬇️ Downloading..."},
+
     "too_big": {
         "ru": "⚠️ Видео слишком большое (>50MB)\n\nЭто ограничение Telegram\n\nСсылка:\n",
         "en": "⚠️ File too large (>50MB)\n\nTelegram limitation\n\nLink:\n"
     },
-    "error": {"ru": "Ошибка ❌", "en": "Error ❌"}
+
+    "error": {
+        "ru": "😔 К сожалению, сейчас не удалось скачать видео.\n\n"
+              "Я попробовал несколько способов, но сервис временно блокирует загрузку.\n\n"
+              "Попробуй чуть позже или выбери другое качество 🙏",
+        "en": "😔 Failed to download.\n\n"
+              "Tried several methods but the service is blocking requests.\n\n"
+              "Please try again later 🙏"
+    }
 }
 
 def t(key, user_id):
@@ -116,8 +129,6 @@ def add_to_blacklist(proxy, error_text):
     bl[proxy] = time.time() + ttl
     save_blacklist(bl)
 
-    log(f"[BLACKLIST] {proxy} for {ttl}s")
-
 def load_proxies():
     ensure_file(PROXY_FILE)
     with open(PROXY_FILE) as f:
@@ -132,14 +143,6 @@ def get_active_proxies():
 
     random.shuffle(active)
     return [None] + active[:5]
-
-# ===================== HELPERS =====================
-
-def normalize_url(url):
-    return url.replace("m.my.mail.ru", "my.mail.ru")
-
-def is_supported_url(url):
-    return any(x in url for x in ["youtube", "youtu.be", "vk.com", "mail.ru"])
 
 # ===================== DOWNLOAD =====================
 
@@ -221,10 +224,7 @@ async def set_lang(callback: types.CallbackQuery):
 @dp.message()
 async def handle_video(message: types.Message):
     user_id = message.from_user.id
-    url = normalize_url(message.text.strip())
-
-    if not is_supported_url(url):
-        return
+    url = message.text.strip()
 
     user_requests[user_id] = url
 
@@ -238,7 +238,13 @@ async def handle_quality(callback: types.CallbackQuery):
 
     metrics["total"] += 1
 
-    await callback.message.edit_text(t("downloading", user_id))
+    msg = await callback.message.edit_text(t("status_1", user_id))
+    await asyncio.sleep(1)
+    await msg.edit_text(t("status_2", user_id))
+    await asyncio.sleep(1)
+    await msg.edit_text(t("status_3", user_id))
+    await asyncio.sleep(1)
+    await msg.edit_text(t("status_4", user_id))
 
     file_path = None
 
@@ -259,9 +265,6 @@ async def handle_quality(callback: types.CallbackQuery):
 
         metrics["success"] += 1
 
-    except asyncio.TimeoutError:
-        metrics["timeouts"] += 1
-        await callback.message.answer(t("error", user_id))
     except Exception:
         metrics["fail"] += 1
         await callback.message.answer(t("error", user_id))
@@ -281,7 +284,6 @@ async def handle_webhook(request):
     return web.Response(text="OK")
 
 async def on_startup(app):
-    log(f"[START][BUILD {BUILD_ID}]")
     if WEBHOOK_URL:
         await bot.set_webhook(WEBHOOK_URL)
 
@@ -291,8 +293,6 @@ def create_app():
     app.router.add_get("/", lambda r: web.Response(text="OK"))
     app.on_startup.append(on_startup)
     return app
-
-# ===================== MAIN =====================
 
 if __name__ == "__main__":
     web.run_app(create_app(), host="0.0.0.0", port=PORT)
