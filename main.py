@@ -25,7 +25,10 @@ async def handle_webhook(request):
 async def on_startup(app):
     if WEBHOOK_URL:
         await bot.set_webhook(WEBHOOK_URL)
-
+        
+async def health(req):
+    return web.Response(text="OK")
+    
 def create_app():
     app = web.Application()
     app.router.add_post(WEBHOOK_PATH, handle_webhook)
