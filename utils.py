@@ -1,8 +1,11 @@
 import os
+import time
 
 def log(msg):
-    print(msg, flush=True)
+    ts = time.strftime("%H:%M:%S")
+    print(f"[{ts}] {msg}")
 
 def ensure_file(path):
     if not os.path.exists(path):
-        open(path, "w").close()
+        with open(path, "w"):
+            pass
