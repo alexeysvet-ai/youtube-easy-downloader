@@ -1,7 +1,3 @@
-# IMPORTANT:
-# This file defines the UX of the product.
-# Do not modify without checking user experience.
-
 TEXTS = {
     "welcome": {
         "ru": "👋 Привет!\n\n"
@@ -50,9 +46,15 @@ TEXTS = {
         "en": "🛡 Bypassing restrictions..."
     },
 
-    "status_3": {
+    # 👇 разделение UX
+    "status_video": {
         "ru": "⬇️ Загружаю видео...",
-        "en": "⬇️ Downloading..."
+        "en": "⬇️ Downloading video..."
+    },
+
+    "status_audio": {
+        "ru": "⬇️ Загружаю аудио...",
+        "en": "⬇️ Downloading audio..."
     },
 
     "success": {
@@ -78,8 +80,9 @@ TEXTS = {
               "I tried multiple methods, but the service is temporarily blocking requests.\n\n"
               "Please try again later 🙏"
     },
+
     "file_info": {
         "ru": "Скачан файл | {ext} | {size} MB",
         "en": "File downloaded | {ext} | {size} MB"
-}
+    }
 }
