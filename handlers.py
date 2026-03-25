@@ -91,7 +91,14 @@ async def process_download(callback, user_id, url, mode):
     file_path = None
 
     try:
-        file_path, info = await safe_download(url, mode)
+       result = await safe_download(url, mode)
+
+       # 🔥 поддержка старого и нового формата
+       if isinstance(result, tuple):
+         file_path, info = result
+       else:
+         file_path = result
+         info = {}
 
         if not file_path or not os.path.exists(file_path):
             raise RuntimeError("File not created")
