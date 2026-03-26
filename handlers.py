@@ -2,6 +2,7 @@ import os
 import asyncio
 import re
 from pathlib import Path
+from datetime import datetime, timezone  # --- NEW (20260326-01) ---
 from aiogram import types, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -82,6 +83,22 @@ def register_handlers(dp: Dispatcher):
         if not url:
             return
 
+        # --- V2 LAG DETECTION (20260326-01 SAFE) ---
+        now = datetime.now(timezone.utc)
+        msg_time = message.date
+        lag_sec = (now - msg_time).total_seconds()
+
+        if lag_sec > 25:
+            await message.answer(
+                "⏳ Запуск занял больше времени, чем обычно\n🚀 Я уже начал обработку"
+            )
+        elif lag_sec > 10:
+            await message.answer(
+                "⏳ Запуск занял чуть больше времени, чем обычно\n🚀 Начинаю обработку..."
+            )
+        else:
+            await message.answer("🚀 Начинаю обработку...")
+
         user_requests[user_id] = url
 
         await message.answer(
@@ -110,7 +127,6 @@ async def process_download(callback, user_id, url, mode):
     await callback.message.answer(t("status_2", user_id))
     await asyncio.sleep(1)
 
-    # 👇 ключевой фикс UX
     if mode == "audio":
         await callback.message.answer(t("status_audio", user_id))
     else:
@@ -139,9 +155,16 @@ async def process_download(callback, user_id, url, mode):
 
         # ===== TITLE FIX =====
         title = safe_title(info, file_path)
+
+        # --- FORMAT FIX (20260326-01 SAFE) ---
         ext = info.get("ext", "mp4")
         abr = info.get("abr")
         uploader = info.get("uploader", "")
+
+        # 👉 если аудио — принудительно считаем mp3 (UX слой)
+        display_ext = ext
+        if mode == "audio":
+            display_ext = "mp3"
 
         new_path = f"/tmp/{title}.{ext}"
 
@@ -153,18 +176,22 @@ async def process_download(callback, user_id, url, mode):
 
         # ===== RESULT TEXT =====
         result_text = t("file_info", user_id).format(
-            ext=ext.upper(),
+            ext=display_ext.upper(),
             size=size_mb
         )
 
-        if mode == "audio" and abr:
-            result_text += f" | {int(abr)} kbps"
+        # --- BITRATE FIX (20260326-01 SAFE) ---
+        if mode == "audio":
+            if abr:
+                result_text += f" | {int(abr)} kbps"
+            else:
+                result_text += " | ~192 kbps"
 
         await callback.message.answer(
             t("success", user_id) + "\n\n" + result_text
         )
 
-        # ===== SEND (КРИТИЧНЫЙ ФИКС) =====
+        # ===== SEND =====
         if mode == "audio":
             await callback.message.answer_audio(
                 types.FSInputFile(file_path),
