@@ -96,6 +96,9 @@ def register_handlers(dp: Dispatcher):
 
     @dp.message(Command("start"))
     async def start(message: types.Message):
+        # --- INIT ACTIVITY TIMESTAMP (UX FIX) ---
+        global last_update_ts
+        last_update_ts = datetime.now(timezone.utc).timestamp()
         await message.answer(
             TEXTS["choose_lang"]["ru"] + " / " + TEXTS["choose_lang"]["en"],
             reply_markup=lang_keyboard()
