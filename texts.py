@@ -108,8 +108,8 @@ TEXTS = {
 },
 
 "lag_long": {
-    "ru": "⏳ Запуск занял больше времени, чем обычно\n🚀 Я уже начал обработку",
-    "en": "⏳ Startup took longer than usual\n🚀 Processing already started"
+    "ru": "😴 Похоже, я немного задремал...\n🚀 Уже проснулся и начинаю обработку",
+    "en": "😴 Looks like I dozed off for a bit...\n🚀 I'm awake now and starting processing"
 },
 
 "invalid_url": {
