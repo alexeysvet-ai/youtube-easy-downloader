@@ -110,19 +110,20 @@ def register_handlers(dp: Dispatcher):
 
         lag_sec = (now - message.date).total_seconds()
 
+        # --- LAG DETECTION (FIX 20260326) ---
         sleep_detected = False
 
-        # --- COLD START DETECTION (20260326 SAFE) ---
-        if last_update_ts:
-            delta = now_ts - last_update_ts
-            if delta > 30:
-                sleep_detected = True
-        else:
+        if last_update_ts is None:
             # первый запрос после старта процесса
             uptime = now_ts - process_start_ts
             if uptime > 5:
                 sleep_detected = True
+        else:
+            delta = now_ts - last_update_ts
+            if delta > 30:
+                sleep_detected = True
 
+        # обновляем timestamp ПОСЛЕ проверки
         last_update_ts = now_ts
 
         if sleep_detected:
