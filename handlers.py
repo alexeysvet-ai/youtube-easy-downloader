@@ -1,8 +1,11 @@
+# === handlers.py (FULL FILE) ===
+# BUILD: 20260326-02
+
 import os
 import asyncio
 import re
 from pathlib import Path
-from datetime import datetime, timezone  # --- NEW (20260326-01) ---
+from datetime import datetime, timezone
 from aiogram import types, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -32,6 +35,13 @@ def safe_title(info, file_path):
         title = Path(file_path).stem
 
     return sanitize_filename(title)
+
+# --- URL EXTRACTION (20260326-02 SAFE) ---
+def extract_url(text: str) -> str | None:
+    if not text:
+        return None
+    match = re.search(r'(https?://[^\s]+)', text)
+    return match.group(1) if match else None
 
 # ===================== UI =====================
 
@@ -78,26 +88,26 @@ def register_handlers(dp: Dispatcher):
     @dp.message(lambda message: message.text and not message.text.startswith("/"))
     async def handle_video(message: types.Message):
         user_id = message.from_user.id
-        url = (message.text or "").strip()
+
+        # --- INPUT VALIDATION (20260326-02 SAFE) ---
+        raw_text = (message.text or "").strip()
+        url = extract_url(raw_text)
 
         if not url:
+            await message.answer(t("invalid_url", user_id))
             return
 
-        # --- V2 LAG DETECTION (20260326-01 SAFE) ---
+        # --- V2 LAG DETECTION (20260326-02 SAFE, LOCALIZED) ---
         now = datetime.now(timezone.utc)
         msg_time = message.date
         lag_sec = (now - msg_time).total_seconds()
 
         if lag_sec > 25:
-            await message.answer(
-                "⏳ Запуск занял больше времени, чем обычно\n🚀 Я уже начал обработку"
-            )
+            await message.answer(t("lag_long", user_id))
         elif lag_sec > 10:
-            await message.answer(
-                "⏳ Запуск занял чуть больше времени, чем обычно\n🚀 Начинаю обработку..."
-            )
+            await message.answer(t("lag_short", user_id))
         else:
-            await message.answer("🚀 Начинаю обработку...")
+            await message.answer(t("start_processing", user_id))
 
         user_requests[user_id] = url
 
@@ -153,15 +163,12 @@ async def process_download(callback, user_id, url, mode):
             await callback.message.answer(t("too_big", user_id) + url)
             return
 
-        # ===== TITLE FIX =====
         title = safe_title(info, file_path)
 
-        # --- FORMAT FIX (20260326-01 SAFE) ---
         ext = info.get("ext", "mp4")
         abr = info.get("abr")
         uploader = info.get("uploader", "")
 
-        # 👉 если аудио — принудительно считаем mp3 (UX слой)
         display_ext = ext
         if mode == "audio":
             display_ext = "mp3"
@@ -174,13 +181,11 @@ async def process_download(callback, user_id, url, mode):
         except Exception as e:
             log(f"[RENAME ERROR] {e}")
 
-        # ===== RESULT TEXT =====
         result_text = t("file_info", user_id).format(
             ext=display_ext.upper(),
             size=size_mb
         )
 
-        # --- BITRATE FIX (20260326-01 SAFE) ---
         if mode == "audio":
             if abr:
                 result_text += f" | {int(abr)} kbps"
@@ -191,7 +196,6 @@ async def process_download(callback, user_id, url, mode):
             t("success", user_id) + "\n\n" + result_text
         )
 
-        # ===== SEND =====
         if mode == "audio":
             await callback.message.answer_audio(
                 types.FSInputFile(file_path),
