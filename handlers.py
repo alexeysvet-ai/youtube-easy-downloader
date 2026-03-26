@@ -1,4 +1,4 @@
-# === handlers.py (FULL FILE) ===
+    # === handlers.py (FULL FILE) ===
 # BUILD: 20260326-02
 
 import os
@@ -19,6 +19,7 @@ semaphore = asyncio.Semaphore(1)
 
 user_lang = {}
 user_requests = {}
+last_update_ts = None
 
 # ===================== HELPERS =====================
 
@@ -100,9 +101,26 @@ def register_handlers(dp: Dispatcher):
         # --- V2 LAG DETECTION (20260326-02 SAFE, LOCALIZED) ---
         now = datetime.now(timezone.utc)
         msg_time = message.date
-        lag_sec = (now - msg_time).total_seconds()
+        # --- COLD START + LAG (20260326-04 SAFE) ---
+        global last_update_ts
 
-        if lag_sec > 25:
+        now = datetime.now(timezone.utc)
+        now_ts = now.timestamp()
+
+        lag_sec = (now - message.date).total_seconds()
+
+        sleep_detected = False
+
+        if last_update_ts:
+            delta = now_ts - last_update_ts
+            if delta > 30:
+                sleep_detected = True
+
+        last_update_ts = now_ts
+
+        if sleep_detected:
+            await message.answer(t("lag_long", user_id))
+        elif lag_sec > 25:
             await message.answer(t("lag_long", user_id))
         elif lag_sec > 10:
             await message.answer(t("lag_short", user_id))
@@ -121,6 +139,11 @@ def register_handlers(dp: Dispatcher):
         user_id = callback.from_user.id
         url = user_requests.get(user_id)
         mode = callback.data.split("_")[1]
+
+        # --- STATE EXPIRATION CHECK (20260326-04 SAFE) ---
+        if not url:
+            await callback.message.answer(t("expired_request", user_id))
+            return
 
         await callback.answer()
 
