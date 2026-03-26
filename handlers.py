@@ -172,8 +172,7 @@ def register_handlers(dp: Dispatcher):
             await callback.message.answer(t("lag_long", user_id))
         elif lag_sec > 10:
             await callback.message.answer(t("lag_short", user_id))
-        else:
-            await callback.message.answer(t("start_processing", user_id))
+
         asyncio.create_task(process_download(callback, user_id, url, mode))
 
 
