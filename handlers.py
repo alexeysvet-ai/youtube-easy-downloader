@@ -124,8 +124,7 @@ def register_handlers(dp: Dispatcher):
             await message.answer(t("lag_long", user_id))
         elif lag_sec > 10:
             await message.answer(t("lag_short", user_id))
-        else:
-            pass
+
 
         user_requests[user_id] = url
 
