@@ -146,7 +146,35 @@ def register_handlers(dp: Dispatcher):
             return
 
         await callback.answer()
+        # --- LAG FOR CALLBACK (20260326-05 SAFE) ---
+        now = datetime.now(timezone.utc)
 
+        # используем message.date как fallback
+        msg_time = callback.message.date if callback.message else now
+
+        now_ts = now.timestamp()
+
+        sleep_detected = False
+
+        global last_update_ts
+
+        if last_update_ts:
+            delta = now_ts - last_update_ts
+            if delta > 30:
+                sleep_detected = True
+
+        last_update_ts = now_ts
+
+        lag_sec = (now - msg_time).total_seconds()
+
+        if sleep_detected:
+            await callback.message.answer(t("lag_long", user_id))
+        elif lag_sec > 25:
+            await callback.message.answer(t("lag_long", user_id))
+        elif lag_sec > 10:
+            await callback.message.answer(t("lag_short", user_id))
+        else:
+            await callback.message.answer(t("start_processing", user_id))
         asyncio.create_task(process_download(callback, user_id, url, mode))
 
 
