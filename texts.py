@@ -93,5 +93,27 @@ TEXTS = {
     "file_info": {
         "ru": "Скачан файл | {ext} | {size} MB",
         "en": "File downloaded | {ext} | {size} MB"
-    }
+    },
+# === ADD TO TEXTS ===
+# BUILD: 20260326-02
+
+"start_processing": {
+    "ru": "🚀 Начинаю обработку...",
+    "en": "🚀 Starting processing..."
+},
+
+"lag_short": {
+    "ru": "⏳ Запуск занял чуть больше времени, чем обычно\n🚀 Начинаю обработку...",
+    "en": "⏳ Startup took a bit longer than usual\n🚀 Starting processing..."
+},
+
+"lag_long": {
+    "ru": "⏳ Запуск занял больше времени, чем обычно\n🚀 Я уже начал обработку",
+    "en": "⏳ Startup took longer than usual\n🚀 Processing already started"
+},
+
+"invalid_url": {
+    "ru": "Похоже, это не ссылка 🙂\n\nПришли, пожалуйста, ссылку на видео (YouTube, VK и т.д.), и я скачаю аудио",
+    "en": "That doesn't look like a valid link 🙂\n\nPlease send a video URL (YouTube, VK, etc.), and I’ll download the audio"
+}    
 }
