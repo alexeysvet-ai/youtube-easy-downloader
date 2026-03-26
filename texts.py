@@ -97,11 +97,6 @@ TEXTS = {
 # === ADD TO TEXTS ===
 # BUILD: 20260326-02
 
-"start_processing": {
-    "ru": "🚀 Начинаю обработку...",
-    "en": "🚀 Starting processing..."
-},
-
 "lag_short": {
     "ru": "⏳ Запуск занял чуть больше времени, чем обычно\n🚀 Начинаю обработку...",
     "en": "⏳ Startup took a bit longer than usual\n🚀 Starting processing..."
