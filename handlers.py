@@ -111,9 +111,15 @@ def register_handlers(dp: Dispatcher):
 
         sleep_detected = False
 
+        # --- COLD START DETECTION (20260326 SAFE) ---
         if last_update_ts:
             delta = now_ts - last_update_ts
             if delta > 30:
+                sleep_detected = True
+        else:
+            # первый запрос после старта процесса
+            uptime = now_ts - process_start_ts
+            if uptime > 5:
                 sleep_detected = True
 
         last_update_ts = now_ts
@@ -157,9 +163,15 @@ def register_handlers(dp: Dispatcher):
 
         global last_update_ts
 
+        # --- COLD START DETECTION (20260326 SAFE) ---
         if last_update_ts:
             delta = now_ts - last_update_ts
             if delta > 30:
+                sleep_detected = True
+        else:
+            # первый запрос после старта процесса
+            uptime = now_ts - process_start_ts
+            if uptime > 5:
                 sleep_detected = True
 
         last_update_ts = now_ts
