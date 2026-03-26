@@ -23,7 +23,26 @@ last_update_ts = None
 process_start_ts = datetime.now(timezone.utc).timestamp()
 
 # ===================== HELPERS =====================
+# --- LAG DETECTION HELPER (20260326 UX SAFE) ---
+def detect_sleep(now_ts: float, process_start_ts: float) -> bool:
+    global last_update_ts
 
+    sleep_detected = False
+
+    if last_update_ts is None:
+        # первый запрос после старта процесса
+        uptime = now_ts - process_start_ts
+        if uptime > 5:
+            sleep_detected = True
+    else:
+        delta = now_ts - last_update_ts
+        if delta > 30:
+            sleep_detected = True
+
+    # обновляем timestamp ПОСЛЕ проверки
+    last_update_ts = now_ts
+
+    return sleep_detected
 def t(key, user_id):
     return TEXTS[key][user_lang.get(user_id, "ru")]
 
@@ -106,25 +125,11 @@ def register_handlers(dp: Dispatcher):
         global last_update_ts
 
         now = datetime.now(timezone.utc)
-        now_ts = now.timestamp()
+        # --- LAG DETECTION ---
+        now_ts = datetime.now(timezone.utc).timestamp()
+        sleep_detected = detect_sleep(now_ts, process_start_ts)
 
-        lag_sec = (now - message.date).total_seconds()
-
-        # --- LAG DETECTION (FIX 20260326) ---
-        sleep_detected = False
-
-        if last_update_ts is None:
-            # первый запрос после старта процесса
-            uptime = now_ts - process_start_ts
-            if uptime > 5:
-                sleep_detected = True
-        else:
-            delta = now_ts - last_update_ts
-            if delta > 30:
-                sleep_detected = True
-
-        # обновляем timestamp ПОСЛЕ проверки
-        last_update_ts = now_ts
+        lag_sec = (datetime.now(timezone.utc) - message.date).total_seconds()
 
         if sleep_detected:
             await message.answer(t("lag_long", user_id))
@@ -159,33 +164,18 @@ def register_handlers(dp: Dispatcher):
         # используем message.date как fallback
         msg_time = callback.message.date if callback.message else now
 
-        now_ts = now.timestamp()
+        # --- LAG DETECTION ---
+        now_ts = datetime.now(timezone.utc).timestamp()
+        sleep_detected = detect_sleep(now_ts, process_start_ts)
 
-        sleep_detected = False
-
-        global last_update_ts
-
-        # --- COLD START DETECTION (20260326 SAFE) ---
-        if last_update_ts:
-            delta = now_ts - last_update_ts
-            if delta > 30:
-                sleep_detected = True
-        else:
-            # первый запрос после старта процесса
-            uptime = now_ts - process_start_ts
-            if uptime > 5:
-                sleep_detected = True
-
-        last_update_ts = now_ts
-
-        lag_sec = (now - msg_time).total_seconds()
+        lag_sec = (datetime.now(timezone.utc) - message.date).total_seconds()
 
         if sleep_detected:
-            await callback.message.answer(t("lag_long", user_id))
+            await message.answer(t("lag_long", user_id))
         elif lag_sec > 25:
-            await callback.message.answer(t("lag_long", user_id))
+            await message.answer(t("lag_long", user_id))
         elif lag_sec > 10:
-            await callback.message.answer(t("lag_short", user_id))
+            await message.answer(t("lag_short", user_id))
 
         asyncio.create_task(process_download(callback, user_id, url, mode))
 
