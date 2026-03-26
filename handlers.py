@@ -129,8 +129,8 @@ def register_handlers(dp: Dispatcher):
         now_ts = datetime.now(timezone.utc).timestamp()
         sleep_detected = detect_sleep(now_ts, process_start_ts)
 
-        lag_sec = (datetime.now(timezone.utc) - message.date).total_seconds()
-
+        lag_sec = (datetime.now(timezone.utc) - msg_time).total_seconds()
+        
         if sleep_detected:
             await message.answer(t("lag_long", user_id))
         elif lag_sec > 25:
@@ -168,7 +168,7 @@ def register_handlers(dp: Dispatcher):
         now_ts = datetime.now(timezone.utc).timestamp()
         sleep_detected = detect_sleep(now_ts, process_start_ts)
 
-        lag_sec = (datetime.now(timezone.utc) - message.date).total_seconds()
+        lag_sec = (datetime.now(timezone.utc) - msg_time).total_seconds()
 
         if sleep_detected:
             await callback.message.answer(t("lag_long", user_id))
