@@ -1,6 +1,6 @@
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types
-
+import asyncio
 from config import TOKEN, WEBHOOK_PATH, WEBHOOK_URL, PORT
 from handlers import register_handlers
 from utils import log
