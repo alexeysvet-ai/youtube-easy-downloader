@@ -20,3 +20,4 @@ BLACKLIST_FILE = "proxy_blacklist.txt"
 TTL_SHORT = 300
 TTL_MEDIUM = 1800
 TTL_LONG = 3600
+YOUTUBE_TEST_VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
