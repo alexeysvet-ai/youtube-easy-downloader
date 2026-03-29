@@ -1,1 +1,1 @@
-brd.superproxy.io:33335
+brd-customer-hl_b5dcd896-zone-residential_proxy1:ytutqt3hjccs@brd.superproxy.io:33335
