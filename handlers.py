@@ -1,5 +1,5 @@
 # === handlers.py (FULL FILE) ===
-# BUILD: 20260326-02
+# BUILD: 20260329-02-UX
 
 import os
 import asyncio
@@ -25,28 +25,10 @@ process_start_ts = datetime.now(timezone.utc).timestamp()
 # ===================== HELPERS =====================
 # --- LAG DETECTION HELPER (20260326 UX SAFE) ---
 def detect_sleep(now_ts: float, process_start_ts: float) -> bool:
-    global last_update_ts
-
-    sleep_detected = False
-
-    if last_update_ts is None:
-        uptime = now_ts - process_start_ts
-        # === CHANGE START ===
-        # увеличен порог cold start, чтобы не срабатывать всегда
-        if uptime > 20:
-            sleep_detected = True
-        # === CHANGE END ===
-    else:
-        delta = now_ts - last_update_ts
-        # === CHANGE START ===
-        # увеличен порог, чтобы не ловить пользовательские паузы
-        if delta > 60:
-            sleep_detected = True
-        # === CHANGE END ===
-
-    last_update_ts = now_ts
-
-    return sleep_detected
+    # === CHANGE START ===
+    # больше не используется — логика перенесена в message.date
+    return False
+    # === CHANGE END ===
 
 def t(key, user_id):
     return TEXTS[key][user_lang.get(user_id, "ru")]
@@ -62,6 +44,7 @@ def safe_title(info, file_path):
 
     return sanitize_filename(title)
 
+# --- URL EXTRACTION (20260326-02 SAFE) ---
 def extract_url(text: str) -> str | None:
     if not text:
         return None
@@ -123,14 +106,13 @@ def register_handlers(dp: Dispatcher):
             await message.answer(t("invalid_url", user_id))
             return
 
-        global last_update_ts
-
-        now_ts = datetime.now(timezone.utc).timestamp()
-        sleep_detected = detect_sleep(now_ts, process_start_ts)
-
         # === CHANGE START ===
-        # убран Telegram lag — источник ложных срабатываний
-        if sleep_detected:
+        now = datetime.now(timezone.utc)
+        msg_time = message.date
+
+        lag_sec = (now - msg_time).total_seconds()
+
+        if lag_sec > 10:
             await message.answer(t("lag_long", user_id))
         # === CHANGE END ===
 
@@ -153,12 +135,13 @@ def register_handlers(dp: Dispatcher):
 
         await callback.answer()
 
-        now_ts = datetime.now(timezone.utc).timestamp()
-        sleep_detected = detect_sleep(now_ts, process_start_ts)
-
         # === CHANGE START ===
-        # убран Telegram lag
-        if sleep_detected:
+        now = datetime.now(timezone.utc)
+        msg_time = callback.message.date if callback.message else now
+
+        lag_sec = (now - msg_time).total_seconds()
+
+        if lag_sec > 10:
             await callback.message.answer(t("lag_long", user_id))
         # === CHANGE END ===
 
