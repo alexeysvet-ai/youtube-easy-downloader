@@ -72,10 +72,7 @@ def quality_keyboard():
 
 async def safe_download(url, mode):
     async with semaphore:
-        return await asyncio.wait_for(
-            asyncio.to_thread(download_video, url, mode),
-            timeout=DOWNLOAD_TIMEOUT
-        )
+        return await asyncio.to_thread(download_video, url, mode)
 
 # ===================== HANDLERS =====================
 
