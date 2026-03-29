@@ -1,5 +1,6 @@
 import uuid
 import yt_dlp
+import asyncio  # [ADD] требуется для create_task, если используется в проекте
 
 from proxy import get_active_proxies, record_success, record_fail, proxy_score, add_to_blacklist
 from utils import log
@@ -64,8 +65,18 @@ def download_video(url, mode):
             record_fail(proxy)
             log(f"[ERROR] proxy={proxy} score={proxy_score(proxy)} error={err}")
 
-            if proxy:
+            # [CHANGE] blacklist только для реальных proxy-ошибок
+            if proxy and (
+                "402" in err or
+                "Payment Required" in err or
+                "403" in err or
+                "ProxyError" in err or
+                "tunnel connection failed" in err.lower()
+            ):
                 add_to_blacklist(proxy, err)
+
+            # [CHANGE] явный лог перехода к следующей попытке
+            log(f"[RETRY NEXT] after proxy={proxy}")
 
             continue
 
