@@ -31,8 +31,8 @@ def download_video(url, mode):
                 "format": format_with_fallback,
                 "outtmpl": f"/tmp/{unique_id}_%(id)s.%(ext)s",
                 "noplaylist": True,
-                "retries": 2,
-                "socket_timeout": 20,
+                "retries": 0,
+                "socket_timeout": 10,
                 "nocheckcertificate": True,
                 "force_ipv4": True,
                 "http_headers": {
