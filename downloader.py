@@ -1,13 +1,53 @@
 import uuid
 import yt_dlp
 import asyncio  # [ADD] требуется для create_task, если используется в проекте
+import requests  # [ADD]
+import multiprocessing
 
 from proxy import get_active_proxies, record_success, record_fail, proxy_score, add_to_blacklist
 from utils import log
 
+
+def is_proxy_alive(proxy):
+    try:
+        proxies = {
+            "http": proxy,
+            "https": proxy,
+        }
+
+        r = requests.get(
+            "https://www.youtube.com",
+            proxies=proxies,
+            timeout=3  # быстрый фильтр
+        )
+
+        return r.status_code == 200
+
+    except Exception:
+        return False
+
+
+def pick_candidate_proxies(proxies, limit=3):
+    candidates = []
+
+    for proxy in proxies:
+        if proxy and is_proxy_alive(proxy):
+            candidates.append(proxy)
+
+        if len(candidates) >= limit:
+            break
+
+    return candidates
+
+
 def download_video(url, mode):
     unique_id = uuid.uuid4().hex
     proxies = get_active_proxies()
+
+    # === CHANGE START: shortlist ===
+    proxies = pick_candidate_proxies(proxies, limit=3)
+    log(f"[CANDIDATES] {proxies}")
+    # === CHANGE END ===
 
     if not proxies:
         raise Exception("No proxies available")
@@ -50,14 +90,37 @@ def download_video(url, mode):
 
             log(f"[PROXY USED] {proxy}")
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
+            # === CHANGE START: multiprocessing timeout ===
+            result_queue = multiprocessing.Queue()
 
-                record_success(proxy)
-                log(f"[SUCCESS] proxy={proxy} score={proxy_score(proxy)}")
+            def _worker(q):
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(url, download=True)
+                        filename = ydl.prepare_filename(info)
+                        q.put((filename, info, None))
+                except Exception as e:
+                    q.put((None, None, str(e)))
 
-                return filename, info
+            p = multiprocessing.Process(target=_worker, args=(result_queue,))
+            p.start()
+            p.join(15)  # timeout на одну попытку
+
+            if p.is_alive():
+                p.terminate()
+                p.join()
+                raise TimeoutError("Proxy attempt timeout")
+
+            filename, info, err = result_queue.get()
+
+            if err:
+                raise Exception(err)
+            # === CHANGE END ===
+
+            record_success(proxy)
+            log(f"[SUCCESS] proxy={proxy} score={proxy_score(proxy)}")
+
+            return filename, info
 
         except Exception as e:
             err = str(e)
