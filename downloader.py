@@ -1,17 +1,18 @@
 # === FILE: downloader.py ===
-# === BUILD: 20260329-01-PROXY ===
+# === BUILD: 20260329-02-PROXY-CLEAN ===
 
 import uuid
 import yt_dlp
-import asyncio  # [ADD] требуется для create_task, если используется в проекте
-import requests
+import asyncio  # [KEEP]
 import multiprocessing
+
+# === CHANGE: requests больше не нужен (удалён) ===
 
 from proxy import get_active_proxies, record_success, record_fail, proxy_score, add_to_blacklist
 from utils import log
 
 
-# === NEW FUNCTION: multiprocessing worker ===
+# === NEW FUNCTION: multiprocessing worker (KEEP) ===
 def ytdlp_worker(q, url, ydl_opts):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -22,62 +23,20 @@ def ytdlp_worker(q, url, ydl_opts):
         q.put((None, None, str(e)))
 
 
-# === HEALTHCHECK FUNCTION (SINGLE SOURCE) ===
-def is_proxy_alive(proxy, idx, total):
-    try:
-        log(f"[HEALTHCHECK {idx}/{total}] proxy={proxy}")
-
-        proxies = {
-            "http": proxy,
-            "https": proxy,
-        }
-
-        r = requests.get(
-            "https://www.youtube.com/generate_204",
-            proxies=proxies,
-            timeout=3
-        )
-
-        log(f"[HEALTHCHECK OK {idx}/{total}] proxy={proxy} status={r.status_code}")
-
-        return r.status_code in (200, 204)
-
-    except Exception as e:
-        log(f"[HEALTHCHECK FAIL {idx}/{total}] proxy={proxy} error={e}")
-        return False
-
-
-# === SHORTLIST SELECTION ===
-def pick_candidate_proxies(proxies, limit=3):
-    candidates = []
-    total = len(proxies)
-
-    for i, proxy in enumerate(proxies, start=1):
-        if proxy and is_proxy_alive(proxy, i, total):
-            candidates.append(proxy)
-
-        if len(candidates) >= limit:
-            break
-
-    return candidates
+# === CHANGE START: удалены healthcheck и shortlist полностью ===
+# удалено:
+# - is_proxy_alive
+# - pick_candidate_proxies
+# === CHANGE END ===
 
 
 # === MAIN DOWNLOAD FUNCTION ===
 def download_video(url, mode):
     unique_id = uuid.uuid4().hex
 
-    all_proxies = get_active_proxies()
-
-    # === CHANGE START: shortlist ===
-    candidates = pick_candidate_proxies(all_proxies, limit=3)
-
-    if not candidates:
-        log("[FALLBACK] no candidates from healthcheck → using raw proxies")
-        candidates = all_proxies[:3]
-
-    proxies = candidates
-
-    log(f"[CANDIDATES] count={len(proxies)} proxies={proxies}")
+    # === CHANGE START: используем все прокси как есть ===
+    proxies = get_active_proxies()
+    log(f"[PROXIES] loaded={len(proxies)}")
     # === CHANGE END ===
 
     if not proxies:
@@ -121,7 +80,7 @@ def download_video(url, mode):
 
             log(f"[PROXY USED] {proxy}")
 
-            # === CHANGE START: multiprocessing timeout ===
+            # === CHANGE START: multiprocessing timeout (KEEP) ===
             result_queue = multiprocessing.Queue()
 
             p = multiprocessing.Process(
@@ -154,7 +113,7 @@ def download_video(url, mode):
             record_fail(proxy)
             log(f"[ERROR] proxy={proxy} score={proxy_score(proxy)} error={err}")
 
-            # === CHANGE: blacklist только для реальных proxy ошибок ===
+            # === KEEP: blacklist логика без изменений ===
             if proxy and (
                 "402" in err or
                 "Payment Required" in err or
