@@ -1,4 +1,4 @@
-    # === handlers.py (FULL FILE) ===
+# === handlers.py (FULL FILE) ===
 # BUILD: 20260326-02
 
 import os
@@ -30,19 +30,24 @@ def detect_sleep(now_ts: float, process_start_ts: float) -> bool:
     sleep_detected = False
 
     if last_update_ts is None:
-        # первый запрос после старта процесса
         uptime = now_ts - process_start_ts
-        if uptime > 5:
+        # === CHANGE START ===
+        # увеличен порог cold start, чтобы не срабатывать всегда
+        if uptime > 20:
             sleep_detected = True
+        # === CHANGE END ===
     else:
         delta = now_ts - last_update_ts
-        if delta > 30:
+        # === CHANGE START ===
+        # увеличен порог, чтобы не ловить пользовательские паузы
+        if delta > 60:
             sleep_detected = True
+        # === CHANGE END ===
 
-    # обновляем timestamp ПОСЛЕ проверки
     last_update_ts = now_ts
 
     return sleep_detected
+
 def t(key, user_id):
     return TEXTS[key][user_lang.get(user_id, "ru")]
 
@@ -57,7 +62,6 @@ def safe_title(info, file_path):
 
     return sanitize_filename(title)
 
-# --- URL EXTRACTION (20260326-02 SAFE) ---
 def extract_url(text: str) -> str | None:
     if not text:
         return None
@@ -96,7 +100,6 @@ def register_handlers(dp: Dispatcher):
 
     @dp.message(Command("start"))
     async def start(message: types.Message):
-        # --- INIT ACTIVITY TIMESTAMP (UX FIX) ---
         global last_update_ts
         last_update_ts = datetime.now(timezone.utc).timestamp()
         await message.answer(
@@ -113,7 +116,6 @@ def register_handlers(dp: Dispatcher):
     async def handle_video(message: types.Message):
         user_id = message.from_user.id
 
-        # --- INPUT VALIDATION (20260326-02 SAFE) ---
         raw_text = (message.text or "").strip()
         url = extract_url(raw_text)
 
@@ -121,26 +123,16 @@ def register_handlers(dp: Dispatcher):
             await message.answer(t("invalid_url", user_id))
             return
 
-        # --- V2 LAG DETECTION (20260326-02 SAFE, LOCALIZED) ---
-        now = datetime.now(timezone.utc)
-        msg_time = message.date
-        # --- COLD START + LAG (20260326-04 SAFE) ---
         global last_update_ts
 
-        now = datetime.now(timezone.utc)
-        # --- LAG DETECTION ---
         now_ts = datetime.now(timezone.utc).timestamp()
         sleep_detected = detect_sleep(now_ts, process_start_ts)
 
-        lag_sec = (datetime.now(timezone.utc) - msg_time).total_seconds()
-        
+        # === CHANGE START ===
+        # убран Telegram lag — источник ложных срабатываний
         if sleep_detected:
             await message.answer(t("lag_long", user_id))
-        elif lag_sec > 25:
-            await message.answer(t("lag_long", user_id))
-        elif lag_sec > 10:
-            await message.answer(t("lag_short", user_id))
-
+        # === CHANGE END ===
 
         user_requests[user_id] = url
 
@@ -155,30 +147,20 @@ def register_handlers(dp: Dispatcher):
         url = user_requests.get(user_id)
         mode = callback.data.split("_")[1]
 
-        # --- STATE EXPIRATION CHECK (20260326-04 SAFE) ---
         if not url:
             await callback.message.answer(t("expired_request", user_id))
             return
 
         await callback.answer()
-        # --- LAG FOR CALLBACK (20260326-05 SAFE) ---
-        now = datetime.now(timezone.utc)
 
-        # используем message.date как fallback
-        msg_time = callback.message.date if callback.message else now
-
-        # --- LAG DETECTION ---
         now_ts = datetime.now(timezone.utc).timestamp()
         sleep_detected = detect_sleep(now_ts, process_start_ts)
 
-        lag_sec = (datetime.now(timezone.utc) - msg_time).total_seconds()
-
+        # === CHANGE START ===
+        # убран Telegram lag
         if sleep_detected:
             await callback.message.answer(t("lag_long", user_id))
-        elif lag_sec > 25:
-            await callback.message.answer(t("lag_long", user_id))
-        elif lag_sec > 10:
-            await callback.message.answer(t("lag_short", user_id))
+        # === CHANGE END ===
 
         asyncio.create_task(process_download(callback, user_id, url, mode))
 
