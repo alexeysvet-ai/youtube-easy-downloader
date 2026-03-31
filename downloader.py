@@ -122,20 +122,30 @@ def download_video(url, mode):
             log(f"[PARENT] p.is_alive={alive}")
 
             if alive:
-                log("[PARENT] before p.terminate")
-                p.terminate()
-                log("[PARENT] after p.terminate")
-
-                p.join()
-                log("[PARENT] after p.join post-terminate")
-
                 try:
                     log("[PARENT] before get_nowait timeout-branch")
                     filename, info, err = result_queue.get_nowait()
                     log("[PARENT] after get_nowait timeout-branch")
                 except Empty:
                     log("[PARENT] queue empty in timeout-branch")
+
+                    log("[PARENT] before p.terminate")
+                    p.terminate()
+                    log("[PARENT] after p.terminate")
+
+                    p.join()
+                    log("[PARENT] after p.join post-terminate")
+
                     raise TimeoutError("Proxy attempt timeout")
+                else:
+                    log("[PARENT] got result before terminate")
+
+                    log("[PARENT] before p.terminate")
+                    p.terminate()
+                    log("[PARENT] after p.terminate")
+
+                    p.join()
+                    log("[PARENT] after p.join post-terminate")
             else:
                 try:
                     log("[PARENT] before get_nowait normal-branch")
@@ -144,7 +154,6 @@ def download_video(url, mode):
                 except Empty:
                     log("[PARENT] queue empty in normal-branch")
                     raise Exception("Worker finished without result")
-
             log(f"[PARENT] err is {'set' if err else 'empty'}")
 
             if err:
