@@ -106,7 +106,7 @@ TEXTS = {
 "expired_request": {
     "ru": "Похоже, запрос устарел 🙂\n\nОтправь ссылку ещё раз, и я продолжу",
     "en": "Looks like this request has expired 🙂\n\nPlease send the link again and I'll continue"
-}
+},
 "stage_restricted": {
     "ru": "⚙️ Этот бот предназначен для технических целей и доступ к нему ограничен.",
     "en": "⚙️ This bot is intended for technical purposes and access is restricted."
