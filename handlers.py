@@ -82,6 +82,7 @@ def register_handlers(dp: Dispatcher):
     async def start(message: types.Message):
         global last_update_ts
         last_update_ts = datetime.now(timezone.utc).timestamp()
+        log(f"[USER START] id={message.from_user.id}")
 
         if STAGE_MODE and message.from_user.id not in ALLOWED_USER_IDS:
             await message.answer(
@@ -102,7 +103,6 @@ def register_handlers(dp: Dispatcher):
     @dp.message(lambda message: message.text and not message.text.startswith("/"))
     async def handle_video(message: types.Message):
         user_id = message.from_user.id
-        log(f"[USER START] id={user.id} username={user.username}")
         if STAGE_MODE and message.from_user.id not in ALLOWED_USER_IDS:
             await message.answer(
                 TEXTS["stage_restricted"]["ru"] + " / " + TEXTS["stage_restricted"]["en"]
