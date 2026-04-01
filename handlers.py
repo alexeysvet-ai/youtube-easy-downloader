@@ -10,7 +10,7 @@ from aiogram import types, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE
+from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE, STAGE_MODE, ALLOWED_USER_IDS
 from downloader import download_video
 from utils import log
 from texts import TEXTS
@@ -82,6 +82,13 @@ def register_handlers(dp: Dispatcher):
     async def start(message: types.Message):
         global last_update_ts
         last_update_ts = datetime.now(timezone.utc).timestamp()
+
+        if STAGE_MODE and message.from_user.id not in ALLOWED_USER_IDS:
+            await message.answer(
+                TEXTS["stage_restricted"]["ru"] + " / " + TEXTS["stage_restricted"]["en"]
+            )
+            return
+
         await message.answer(
             TEXTS["choose_lang"]["ru"] + " / " + TEXTS["choose_lang"]["en"],
             reply_markup=lang_keyboard()
