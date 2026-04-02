@@ -14,7 +14,6 @@ from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE, STAGE_MODE, ALLOWED_USER_IDS
 from downloader import download_video
 from utils import log
 from texts import TEXTS
-from utils_alerts import send_alert
 from datetime import datetime, timezone
 from alerts import send_alert, build_download_fail_alert
 
