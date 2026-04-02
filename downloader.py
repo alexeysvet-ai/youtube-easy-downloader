@@ -8,8 +8,6 @@ import multiprocessing
 from config import YOUTUBE_TEST_VIDEO_URL  # [ADD]
 from config import DOWNLOAD_TIMEOUT
 
-# === CHANGE: requests больше не нужен (удалён) ===
-
 from proxy import get_active_proxies, record_success, record_fail, proxy_score, add_to_blacklist
 from utils import log
 from queue import Empty

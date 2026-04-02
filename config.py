@@ -26,3 +26,4 @@ STAGE_MODE = os.getenv("STAGE_MODE", "false").lower() == "true"
 ALLOWED_USER_IDS = set(
     int(x) for x in os.getenv("ALLOWED_USER_IDS", "").split(",") if x
 )
+ALERT_CHANNEL_ID = os.getenv("ALERT_CHANNEL_ID", "false")

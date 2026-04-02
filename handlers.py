@@ -14,6 +14,9 @@ from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE, STAGE_MODE, ALLOWED_USER_IDS
 from downloader import download_video
 from utils import log
 from texts import TEXTS
+from utils_alerts import send_alert
+from datetime import datetime, timezone
+from alerts import send_alert, build_download_fail_alert
 
 semaphore = asyncio.Semaphore(1)
 
@@ -238,6 +241,9 @@ async def process_download(callback, user_id, url, mode):
     except Exception as e:
         log(f"[FINAL ERROR] {e}")
         await callback.message.answer(t("error", user_id))
+        alert_text = build_download_fail_alert(user_id, url, mode, str(e))
+        await send_alert(alert_text)
+
 
     finally:
         if file_path and os.path.exists(file_path):
