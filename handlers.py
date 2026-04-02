@@ -105,9 +105,7 @@ def register_handlers(dp: Dispatcher):
     @dp.message(lambda message: message.text and not message.text.startswith("/"))
     async def handle_video(message: types.Message):
         user_id = message.from_user.id
-        if message.forward_from_chat:
-            await message.answer(str(message.forward_from_chat.id))
-            return
+
         if STAGE_MODE and message.from_user.id not in ALLOWED_USER_IDS:
             await message.answer(
                 TEXTS["stage_restricted"]["ru"] + " / " + TEXTS["stage_restricted"]["en"]
@@ -161,6 +159,26 @@ def register_handlers(dp: Dispatcher):
 
         asyncio.create_task(process_download(callback, user_id, url, mode))
 
+    # ===================== DEBUG CHANNEL ID =====================
+    @dp.message()
+    async def debug_channel_id(message: types.Message):
+        try:
+            log("[DEBUG CHANNEL] handler triggered")
+
+            if message.forward_from_chat:
+                log(f"[DEBUG CHANNEL] FORWARDED CHAT ID: {message.forward_from_chat.id}")
+                log(f"[DEBUG CHANNEL] TYPE: {message.forward_from_chat.type}")
+                log(f"[DEBUG CHANNEL] TITLE: {message.forward_from_chat.title}")
+            else:
+                log("[DEBUG CHANNEL] NO forward_from_chat")
+
+            if message.sender_chat:
+                log(f"[DEBUG CHANNEL] SENDER CHAT ID: {message.sender_chat.id}")
+
+            log(f"[DEBUG CHANNEL] CURRENT CHAT ID: {message.chat.id}")
+
+        except Exception as e:
+            log(f"[DEBUG CHANNEL ERROR] {e}")
 
 # ===================== PROCESS =====================
 
