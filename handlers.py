@@ -105,6 +105,9 @@ def register_handlers(dp: Dispatcher):
     @dp.message(lambda message: message.text and not message.text.startswith("/"))
     async def handle_video(message: types.Message):
         user_id = message.from_user.id
+        if message.forward_from_chat:
+            await message.answer(str(message.forward_from_chat.id))
+            return
         if STAGE_MODE and message.from_user.id not in ALLOWED_USER_IDS:
             await message.answer(
                 TEXTS["stage_restricted"]["ru"] + " / " + TEXTS["stage_restricted"]["en"]
