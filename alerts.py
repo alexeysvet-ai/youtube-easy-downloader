@@ -3,8 +3,6 @@ from datetime import datetime, timezone
 from config import TOKEN, ALERT_CHANNEL_ID, STAGE_MODE
 from utils import log
 
-bot_alert = Bot(token=TOKEN)
-
 def build_download_fail_alert(user_id: int, url: str, mode: str, err: str) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     env_name = "stage" if STAGE_MODE else "prod"
@@ -22,4 +20,5 @@ def build_download_fail_alert(user_id: int, url: str, mode: str, err: str) -> st
 async def send_alert(text: str):
     log(f"[ALERT DEBUG] chat_id={ALERT_CHANNEL_ID}")
     log(f"[ALERT DEBUG] token={TOKEN[:10]}")
-    await bot_alert.send_message(chat_id=ALERT_CHANNEL_ID, text=text)
+    async with Bot(token=TOKEN) as bot_alert:
+        await bot_alert.send_message(chat_id=ALERT_CHANNEL_ID, text=text)
