@@ -222,19 +222,19 @@ async def process_download(callback, user_id, url, mode):
             if abr:
                 result_text += f" | {int(abr)} kbps"
 
-        await callback.message.answer(
-            t("success", user_id) + "\n\n" + result_text
-        )
+        final_caption = t("success", user_id) + "\n\n" + result_text
 
         if mode == "audio":
             await callback.message.answer_audio(
                 types.FSInputFile(file_path),
                 title=title,
-                performer=uploader or ""
+                performer=uploader or "",
+                caption=final_caption
             )
         else:
             await callback.message.answer_video(
-                types.FSInputFile(file_path)
+                types.FSInputFile(file_path),
+                caption=final_caption
             )
 
     except Exception as e:

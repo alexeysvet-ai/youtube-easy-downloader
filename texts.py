@@ -45,13 +45,14 @@ TEXTS = {
 
     # --- Разделение UX ---
     "status_video": {
-        "ru": "⬇️ Загружаю видео...",
-        "en": "⬇️ Downloading video..."
+        "ru": "⏳ Загружаю видео...\nЭто может занять до нескольких минут, пожалуйста подождите.",
+        "en": "⏳ Downloading video...\nThis may take a few minutes, please wait."
     },
+    
 
     "status_audio": {
-        "ru": "⬇️ Загружаю аудио...",
-        "en": "⬇️ Downloading audio..."
+        "ru": "⏳ Загружаю аудио...\nЭто может занять до нескольких минут, пожалуйста подождите.",
+        "en": "⏳ Downloading audio...\nThis may take a few minutes, please wait."
     },
 
     # --- Успех ---
