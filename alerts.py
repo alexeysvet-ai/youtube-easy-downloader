@@ -6,7 +6,7 @@ from utils import log
 def build_download_fail_alert(user_id: int, url: str, mode: str, err: str) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     env_name = "stage" if STAGE_MODE else "prod"
-    err1 = str(err).replace("ERROR: ", "").Replace("Error: ","")
+    err1 = str(err).replace("ERROR: ", "").replace("Error: ","")
 
     return (
         f"🚨 Download failed\n"
