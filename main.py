@@ -5,6 +5,7 @@ from config import TOKEN, WEBHOOK_PATH, WEBHOOK_URL, PORT
 from handlers import register_handlers
 from utils import log
 from proxy_cron import run_proxy_refresh
+from bot_core.db import test_connection
 
 if not TOKEN:
     raise ValueError("TOKEN not set")
@@ -48,6 +49,13 @@ async def handle_webhook(request):
 async def on_startup(app):
     if WEBHOOK_URL:
         asyncio.create_task(bot.set_webhook(WEBHOOK_URL))
+    # TEST DB CONNECTION
+    try:
+        ok = test_connection()
+        print("DB CONNECTION:", ok)
+    except Exception as e:
+        print("DB CONNECTION ERROR:", e)
+
         
 async def health(req):
     return web.Response(text="OK")
