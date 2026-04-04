@@ -16,7 +16,7 @@ from utils import log
 from texts import TEXTS
 from datetime import datetime, timezone
 from alerts import send_alert, build_download_fail_alert
-from bot_core.db import insert_bot_entryр
+from bot_core.db import insert_bot_entry
 
 semaphore = asyncio.Semaphore(1)
 
