@@ -16,6 +16,7 @@ from utils import log
 from texts import TEXTS
 from datetime import datetime, timezone
 from alerts import send_alert, build_download_fail_alert
+from bot_core.db import insert_bot_entryр
 
 semaphore = asyncio.Semaphore(1)
 
@@ -86,6 +87,11 @@ def register_handlers(dp: Dispatcher):
         last_update_ts = datetime.now(timezone.utc).timestamp()
         log(f"[USER START] id={message.from_user.id}")
 
+        try:
+            insert_bot_entry(BOT_CODE, message.from_user.id)
+        except Exception as e:
+            log(f"[DB INSERT ERROR] {e}")
+
         if STAGE_MODE and message.from_user.id not in ALLOWED_USER_IDS:
             await message.answer(
                 TEXTS["stage_restricted"]["ru"] + " / " + TEXTS["stage_restricted"]["en"]
@@ -96,6 +102,7 @@ def register_handlers(dp: Dispatcher):
             TEXTS["choose_lang"]["ru"] + " / " + TEXTS["choose_lang"]["en"],
             reply_markup=lang_keyboard()
         )
+
 
     @dp.callback_query(lambda c: c.data.startswith("lang_"))
     async def set_lang(callback: types.CallbackQuery):

@@ -4,6 +4,9 @@ from datetime import datetime
 TOKEN = os.getenv("TOKEN")
 BASE_URL = os.getenv("BASE_URL")
 PORT = int(os.getenv("PORT", 10000))
+BOT_CODE = os.getenv("BOT_CODE")
+if not BOT_CODE:
+    raise RuntimeError("BOT_CODE is not set")
 
 BUILD_ID = datetime.utcnow().strftime("%Y%m%d-%H%M")
 

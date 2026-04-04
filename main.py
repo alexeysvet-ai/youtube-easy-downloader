@@ -55,6 +55,7 @@ async def on_startup(app):
         print("DB CONNECTION:", ok)
     except Exception as e:
         print("DB CONNECTION ERROR:", e)
+
         
 async def health(req):
     return web.Response(text="OK")
