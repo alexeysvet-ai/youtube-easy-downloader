@@ -10,7 +10,7 @@ from aiogram import types, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE, STAGE_MODE, ALLOWED_USER_IDS
+from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE, STAGE_MODE, ALLOWED_USER_IDS, BOT_CODE
 from downloader import download_video
 from utils import log
 from texts import TEXTS
