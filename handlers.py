@@ -89,6 +89,7 @@ def register_handlers(dp: Dispatcher):
 
         try:
             insert_bot_entry(BOT_CODE, message.from_user.id)
+            print(f"DB INSERT OK: bot_code={BOT_CODE}, user_id={message.from_user.id}")
         except Exception as e:
             log(f"[DB INSERT ERROR] {e}")
 
