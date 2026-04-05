@@ -109,6 +109,21 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
     except Exception as e:
         log(f"[FINAL ERROR] {e}")
 
+        if "File too big" in str(e):
+            try:
+                insert_bot_event(
+                    BOT_CODE,
+                    user_id,
+                    "download_rejected_too_big",
+                    status="rejected",
+                    mode=mode
+                )
+            except Exception as db_error:
+                log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_rejected_too_big mode={mode} error={db_error}")
+
+            await callback.message.answer(t("too_big", user_id))
+            return
+
         try:
             insert_bot_event(
                 BOT_CODE,

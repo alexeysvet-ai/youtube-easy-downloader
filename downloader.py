@@ -35,7 +35,7 @@ def is_non_retryable_download_error(err: str) -> bool:
         "requested format not available" in err or
         "unsupported url" in err or
         "no video formats found" in err,
-        "file too large" in err
+        "file too big" in err
     )
 
 # === NEW FUNCTION: multiprocessing worker (KEEP) ===
@@ -104,7 +104,7 @@ def download_video(url, mode):
             size = info_check.get("filesize") or info_check.get("filesize_approx")
 
             if size and size > MAX_FILE_SIZE:
-                raise Exception(f"File too large: {size}")
+                raise Exception(f"File too big: {size}")
             # === END PRECHECK ===
             format_string = fmt_map.get(mode, "best")
             format_with_fallback = f"{format_string}/best"
