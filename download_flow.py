@@ -20,7 +20,7 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
             status="success",
             mode=mode
         )
-    except Eception as e:
+    except Exception as e:
         log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_started mode={mode} error={e}")
 
     await callback.message.answer(t("start", user_id))
