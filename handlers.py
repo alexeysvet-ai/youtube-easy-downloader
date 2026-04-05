@@ -115,20 +115,6 @@ def register_handlers(dp: Dispatcher):
             reply_markup=lang_keyboard()
         )
 
-
-    @dp.callback_query(lambda c: c.data.startswith("lang_"))
-    async def set_lang(callback: types.CallbackQuery):
-        lang = callback.data.split("_")[1]
-        user_lang[callback.from_user.id] = lang
-
-        try:
-            set_user_lang(BOT_CODE, callback.from_user.id, lang)
-            log(f"[DB LANG SAVE OK] bot_code={BOT_CODE} user_id={callback.from_user.id} lang={lang}")
-        except Exception as e:
-            log(f"[DB LANG SAVE ERROR] bot_code={BOT_CODE} user_id={callback.from_user.id} lang={lang} error={e}")
-
-        await callback.message.edit_text(t("welcome", callback.from_user.id))
-
     @dp.callback_query(lambda c: c.data.startswith("lang_"))
     async def set_lang(callback: types.CallbackQuery):
         lang = callback.data.split("_")[1]
