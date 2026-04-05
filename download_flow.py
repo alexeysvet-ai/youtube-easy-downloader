@@ -2,7 +2,7 @@ import os
 import asyncio
 from aiogram import types
 
-from config import MAX_FILE_SIZE, BOT_CODE
+from config import BOT_CODE
 from utils import log
 from alerts import send_alert, build_download_fail_alert
 from bot_core.db import insert_bot_event
@@ -51,23 +51,7 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
 
         size = os.path.getsize(file_path)
         size_mb = round(size / (1024 * 1024), 2)
-
-        if size > MAX_FILE_SIZE:
-            try:
-                insert_bot_event(
-                    BOT_CODE,
-                    user_id,
-                    "download_rejected_too_big",
-                    status="rejected",
-                    mode=mode,
-                    file_size_bytes=size
-                )
-            except Exception as e:
-                log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_rejected_too_big mode={mode} error={e}")
-
-            await callback.message.answer(t("too_big", user_id) + url)
-            return
-
+        # size check moved to downloader (pre-download)
         title = safe_title(info, file_path)
 
         ext = info.get("ext", "mp4")

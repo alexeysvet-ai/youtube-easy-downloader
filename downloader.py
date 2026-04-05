@@ -6,8 +6,7 @@ import yt_dlp
 import asyncio  # [KEEP]
 import multiprocessing
 from config import YOUTUBE_TEST_VIDEO_URL  # [ADD]
-from config import DOWNLOAD_TIMEOUT
-
+from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE
 from proxy import get_active_proxies, record_success, record_fail, proxy_score, add_to_blacklist
 from utils import log
 from queue import Empty
@@ -35,7 +34,8 @@ def is_non_retryable_download_error(err: str) -> bool:
         "requested format is not available" in err or
         "requested format not available" in err or
         "unsupported url" in err or
-        "no video formats found" in err
+        "no video formats found" in err,
+        "file too large" in err
     )
 
 # === NEW FUNCTION: multiprocessing worker (KEEP) ===
@@ -88,7 +88,24 @@ def download_video(url, mode):
     for idx, proxy in enumerate(proxies):
         try:
             log(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy}")
+            # === PRECHECK SIZE (P0 FIX) ===
+            ydl_opts_check = {
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+            }
 
+            if proxy:
+                ydl_opts_check["proxy"] = proxy
+
+            with yt_dlp.YoutubeDL(ydl_opts_check) as ydl:
+                info_check = ydl.extract_info(url, download=False)
+
+            size = info_check.get("filesize") or info_check.get("filesize_approx")
+
+            if size and size > MAX_FILE_SIZE:
+                raise Exception(f"File too large: {size}")
+            # === END PRECHECK ===
             format_string = fmt_map.get(mode, "best")
             format_with_fallback = f"{format_string}/best"
 
@@ -205,7 +222,21 @@ def download_video(url, mode):
     # === CHANGE: fallback without proxy (P0 FIX) ===
     try:
         log("[FALLBACK] trying without proxy")
+        # === PRECHECK SIZE (P0 FIX) ===
+        ydl_opts_check = {
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+        }
 
+        with yt_dlp.YoutubeDL(ydl_opts_check) as ydl:
+            info_check = ydl.extract_info(url, download=False)
+
+        size = info_check.get("filesize") or info_check.get("filesize_approx")
+
+        if size and size > MAX_FILE_SIZE:
+            raise Exception(f"File too large: {size}")
+        # === END PRECHECK ===
         format_string = fmt_map.get(mode, "best")
         format_with_fallback = f"{format_string}/best"
 
