@@ -1,5 +1,5 @@
 from config import BOT_CODE
-from utils import log
+from bot_core.utils import log
 from texts import TEXTS
 from bot_core.user_settings import get_user_lang
 
