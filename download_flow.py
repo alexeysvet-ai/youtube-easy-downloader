@@ -7,7 +7,7 @@ from config import TOKEN, ALERT_CHANNEL_ID
 from bot_core.utils import log
 from bot_core.alerts import send_alert, build_download_fail_alert
 from bot_core.events import insert_bot_event
-from bot_helpers import safe_title
+from bot_core.bot_helpers import safe_title
 
 # ===================== PROCESS =====================
 
