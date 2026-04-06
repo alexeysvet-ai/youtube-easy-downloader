@@ -9,13 +9,13 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import STAGE_MODE, ALLOWED_USER_IDS, BOT_CODE
 from downloader import download_video
-from utils import log
+from bot_core.utils import log
 from texts import TEXTS
-from alerts import send_alert, build_download_fail_alert
+from bot_core.alerts import send_alert, build_download_fail_alert
 from bot_core.events import insert_bot_entry, insert_bot_event
 from bot_core.user_settings import set_user_lang
 from bot_i18n import t, user_lang
-from bot_helpers import sanitize_filename, safe_title, extract_url
+from bot_core.bot_helpers import sanitize_filename, safe_title, extract_url
 from download_flow import process_download
 from bot_ui import quality_keyboard
 

@@ -2,7 +2,7 @@ import time
 import random
 
 from config import PROXY_FILE, BLACKLIST_FILE, TTL_SHORT, TTL_MEDIUM, TTL_LONG
-from utils import ensure_file
+from bot_core.utils import ensure_file
 
 proxy_stats = {}
 

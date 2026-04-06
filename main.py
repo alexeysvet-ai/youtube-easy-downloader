@@ -3,7 +3,7 @@ from aiogram import Bot, Dispatcher, types
 import asyncio
 from config import TOKEN, WEBHOOK_PATH, WEBHOOK_URL, PORT
 from handlers import register_handlers
-from utils import log
+from bot_core.utils import log
 from proxy_cron import run_proxy_refresh
 from bot_core.db import test_connection
 
