@@ -14,7 +14,6 @@ from texts import TEXTS
 from alerts import send_alert, build_download_fail_alert
 from bot_core.events import insert_bot_entry, insert_bot_event
 from bot_core.user_settings import set_user_lang
-from bot_core.access import is_user_allowed
 from bot_i18n import t, user_lang
 from bot_helpers import sanitize_filename, safe_title, extract_url
 from download_flow import process_download
