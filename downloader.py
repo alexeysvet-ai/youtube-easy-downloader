@@ -192,7 +192,7 @@ def download_video(url, mode):
 
     for idx, proxy in enumerate(proxies):
         try:
-            log(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy}")
+            log(f"[TRY {idx+1}/{len(proxies)}] proxy={proxy} score={proxy_score(proxy)}")
 
             precheck_size(url, mode, proxy)
             filename, info = run_download_attempt(url, mode, proxy, unique_id)
