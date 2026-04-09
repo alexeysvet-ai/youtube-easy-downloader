@@ -133,45 +133,35 @@ def run_download_attempt(url: str, mode: str, proxy: str | None, unique_id: str)
     p.start()
     log("[PARENT] after p.start")
 
-    p.join(DOWNLOAD_TIMEOUT)
-    log("[PARENT] after p.join")
+    try:
+        log("[PARENT] before queue.get (main path)")
+        filename, info, err = result_queue.get(timeout=DOWNLOAD_TIMEOUT)
+        log("[PARENT] after queue.get (main path)")
+    except Empty:
+        log("[PARENT] queue timeout - terminating process")
 
+        try:
+            p.terminate()
+        except Exception:
+            pass
+
+        p.join(timeout=1)
+        log("[PARENT] after terminate+join (timeout path)")
+
+        raise TimeoutError("Proxy attempt timeout")
+
+    # process lifecycle no longer blocks result
     alive = p.is_alive()
-    log(f"[PARENT] p.is_alive={alive}")
+    log(f"[PARENT] p.is_alive(after get)={alive}")
 
     if alive:
         try:
-            log("[PARENT] before get_nowait timeout-branch")
-            filename, info, err = result_queue.get_nowait()
-            log("[PARENT] after get_nowait timeout-branch")
-        except Empty:
-            log("[PARENT] queue empty in timeout-branch")
-
-            log("[PARENT] before p.terminate")
             p.terminate()
-            log("[PARENT] after p.terminate")
+        except Exception:
+            pass
 
-            p.join()
-            log("[PARENT] after p.join post-terminate")
-
-            raise TimeoutError("Proxy attempt timeout")
-        else:
-            log("[PARENT] got result before terminate")
-
-            log("[PARENT] before p.terminate")
-            p.terminate()
-            log("[PARENT] after p.terminate")
-
-            p.join()
-            log("[PARENT] after p.join post-terminate")
-    else:
-        try:
-            log("[PARENT] before get_nowait normal-branch")
-            filename, info, err = result_queue.get_nowait()
-            log("[PARENT] after get_nowait normal-branch")
-        except Empty:
-            log("[PARENT] queue empty in normal-branch")
-            raise Exception("Worker finished without result")
+    p.join(timeout=1)
+    log("[PARENT] after terminate+join (normal path)")
 
     log(f"[PARENT] err is {'set' if err else 'empty'}")
 
