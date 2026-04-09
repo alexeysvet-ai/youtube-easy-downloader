@@ -28,13 +28,13 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
 
     await callback.message.answer(t("status_1", user_id))
     await asyncio.sleep(1)
-    await callback.message.answer(t("status_2", user_id))
+    await callback.message.edit_text(t("status_2", user_id))
     await asyncio.sleep(1)
 
     if mode == "audio":
-        await callback.message.answer(t("status_audio", user_id))
+        await callback.message.edit_text(t("status_audio", user_id))
     else:
-        await callback.message.answer(t("status_video", user_id))
+        await callback.message.edit_text(t("status_video", user_id))
 
     file_path = None
 
