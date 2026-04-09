@@ -1,6 +1,7 @@
 import os
 import asyncio
 from aiogram import types
+import time
 
 from config import BOT_CODE
 from config import TOKEN, ALERT_CHANNEL_ID 
@@ -25,16 +26,16 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
         log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_started mode={mode} error={e}")
 
     await callback.message.answer(t("start", user_id))
-
-    await callback.message.answer(t("status_1", user_id))
-    await asyncio.sleep(1)
-    await callback.message.answer(t("status_2", user_id))
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
+    msg = await callback.message.answer(t("status_1", user_id))
+    await asyncio.sleep(2)
+    await msg.edit_text(t("status_2", user_id))
+    await asyncio.sleep(2)
 
     if mode == "audio":
-        await callback.message.answer(t("status_audio", user_id))
+        await msg.edit_text(t("status_audio", user_id))
     else:
-        await callback.message.answer(t("status_video", user_id))
+        await msg.edit_text(t("status_video", user_id))
 
     file_path = None
 
@@ -82,6 +83,10 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
 
         final_caption = t("success", user_id) + "\n\n" + result_text
 
+
+        send_start = time.time()
+        log(f"[SEND START] user={user_id} path={file_path}")
+
         if mode == "audio":
             await callback.message.answer_audio(
                 types.FSInputFile(file_path),
@@ -94,6 +99,9 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
                 types.FSInputFile(file_path),
                 caption=final_caption
             )
+
+        send_time = time.time() - send_start
+        log(f"[SEND DONE] user={user_id} time={send_time:.2f}s")
 
         try:
             insert_bot_event(
