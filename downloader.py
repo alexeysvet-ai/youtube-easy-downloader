@@ -206,13 +206,11 @@ def download_video(url, mode):
             err = str(e)
             last_error = err
 
-            record_fail(proxy)
-            log(f"[ERROR] proxy={proxy} score={proxy_score(proxy)} error={err}")
-
             if is_non_retryable_download_error(err):
                 log(f"[STOP RETRY] non-retryable error on proxy={proxy}: {err}")
                 raise Exception(err)
-
+            record_fail(proxy)
+            log(f"[ERROR] proxy={proxy} score={proxy_score(proxy)} error={err}")
             if proxy and (
                 "402" in err or
                 "payment required" in err.lower() or
