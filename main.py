@@ -1,4 +1,4 @@
-from aiohttp import web
+from aiohttp import web, ClientTimeout
 from aiogram import Bot, Dispatcher, types
 import asyncio
 from config import TELEGRAM_TIMEOUT, TOKEN, WEBHOOK_PATH, WEBHOOK_URL, PORT
