@@ -1,6 +1,7 @@
 import os
 import asyncio
 from aiogram import types
+import time
 
 from config import BOT_CODE
 from config import TOKEN, ALERT_CHANNEL_ID 
@@ -82,6 +83,10 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
 
         final_caption = t("success", user_id) + "\n\n" + result_text
 
+
+        send_start = time.time()
+        log(f"[SEND START] user={user_id} path={file_path}")
+
         if mode == "audio":
             await callback.message.answer_audio(
                 types.FSInputFile(file_path),
@@ -94,6 +99,9 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
                 types.FSInputFile(file_path),
                 caption=final_caption
             )
+
+        send_time = time.time() - send_start
+        log(f"[SEND DONE] user={user_id} time={send_time:.2f}s")
 
         try:
             insert_bot_event(
