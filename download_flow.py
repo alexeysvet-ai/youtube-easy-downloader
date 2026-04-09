@@ -25,16 +25,16 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
         log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_started mode={mode} error={e}")
 
     await callback.message.answer(t("start", user_id))
-
-    await callback.message.answer(t("status_1", user_id))
-    await asyncio.sleep(1)
-    await callback.message.edit_text(t("status_2", user_id))
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
+    msg = await callback.message.answer(t("status_1", user_id))
+    await asyncio.sleep(2)
+    await msg.edit_text(t("status_2", user_id))
+    await asyncio.sleep(2)
 
     if mode == "audio":
-        await callback.message.edit_text(t("status_audio", user_id))
+        await msg.edit_text(t("status_audio", user_id))
     else:
-        await callback.message.edit_text(t("status_video", user_id))
+        await msg.edit_text(t("status_video", user_id))
 
     file_path = None
 
