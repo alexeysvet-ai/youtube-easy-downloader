@@ -96,6 +96,7 @@ def build_ydl_opts(mode: str, unique_id: str, proxy: str | None = None, download
     if download:
         ydl_opts["outtmpl"] = f"/tmp/{unique_id}_%(id)s.%(ext)s"
         ydl_opts["retries"] = 0
+        ydl_opts["max_filesize"] = MAX_FILE_SIZE
     else:
         ydl_opts["quiet"] = True
         ydl_opts["no_warnings"] = True
@@ -113,11 +114,11 @@ def precheck_size(url: str, mode: str, proxy: str | None = None) -> None:
         info_check = ydl.extract_info(url, download=False)
         log_available_formats(info_check)
 
-    size = info_check.get("filesize") or info_check.get("filesize_approx")
+    size = info_check.get("filesize")
 
-    if size and size > MAX_FILE_SIZE:
+    # Используем только точный размер; если он неизвестен — не блокируем скачивание
+    if size is not None and size > MAX_FILE_SIZE:
         raise Exception(f"File too big: {size}")
-
 
 def run_download_attempt(url: str, mode: str, proxy: str | None, unique_id: str):
     ydl_opts = build_ydl_opts(mode, unique_id=unique_id, proxy=proxy, download=True)
@@ -168,6 +169,9 @@ def run_download_attempt(url: str, mode: str, proxy: str | None, unique_id: str)
     log(f"[PARENT] err is {'set' if err else 'empty'}")
 
     if err:
+        err_lower = err.lower()
+        if "max-filesize" in err_lower or "larger than max-filesize" in err_lower:
+            raise Exception(f"File too big: {MAX_FILE_SIZE}")
         raise Exception(err)
 
     return filename, info
