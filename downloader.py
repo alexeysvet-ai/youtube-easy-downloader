@@ -129,7 +129,7 @@ def precheck_size(url: str, mode: str, proxy: str | None = None) -> None:
         info_check = ydl.extract_info(url, download=False)
         log_available_formats(info_check)
 
-    size = info_check.get("filesize")
+    size = info_check.get("filesize") or info_check.get("filesize_approx")
 
     # Используем только точный размер; если он неизвестен — не блокируем скачивание
     if size is not None and size > MAX_FILE_SIZE:
