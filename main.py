@@ -10,8 +10,13 @@ from bot_core.db import test_connection
 if not TOKEN:
     raise ValueError("TOKEN not set")
 
-timeout = ClientTimeout(total=TELEGRAM_TIMEOUT)
+timeout = ClientTimeout(
+    total=TELEGRAM_TIMEOUT,  # Общий таймаут запроса
+    sock_read=TELEGRAM_TIMEOUT/1.5  # Время ожидания ответа от Telegram
+)
 bot = Bot(token=TOKEN, timeout=timeout)
+
+
 dp = Dispatcher()
 
 register_handlers(dp)
