@@ -11,6 +11,7 @@ from proxy import get_active_proxies, record_success, record_fail, proxy_score, 
 from bot_core.utils import log
 from format_logger import log_available_formats
 from queue import Empty
+import os
 
 
 # === NEW: proxy block detection (P0 FIX) ===
@@ -50,8 +51,22 @@ def ytdlp_worker(q, url, ydl_opts):
             print("[WORKER] before extract_info")
             info = ydl.extract_info(url, download=True)
             print("[WORKER] after extract_info")
+            if info:
+                log(
+                    f"[SELECTED FORMAT] id={info.get('format_id')} "
+                    f"ext={info.get('ext')} "
+                    f"height={info.get('height')} "
+                    f"vcodec={info.get('vcodec')} "
+                    f"acodec={info.get('acodec')} "
+                    f"filesize={info.get('filesize')}"
+                )
 
             filename = ydl.prepare_filename(info)
+
+            if not os.path.exists(filename):
+                size = info.get("filesize") or info.get("filesize_approx") or MAX_FILE_SIZE
+                q.put((None, None, f"File too big: {size}"))
+                return
             print(f"[WORKER] prepared filename={filename}")
 
             print("[WORKER] before q.put success")
