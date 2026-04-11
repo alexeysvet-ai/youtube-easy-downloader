@@ -9,6 +9,7 @@ from bot_core.utils import log
 from bot_core.alerts import send_alert, build_download_fail_alert
 from bot_core.events import insert_bot_event
 from bot_core.bot_helpers import safe_title
+from send_file_with_retry import send_media_with_retry
 
 # ===================== PROCESS =====================
 
@@ -86,19 +87,19 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
 
         send_start = time.time()
         log(f"[SEND START] user={user_id} path={file_path}")
-
-        if mode == "audio":
-            await callback.message.answer_audio(
-                types.FSInputFile(file_path),
-                title=title,
-                performer=uploader or "",
-                caption=final_caption
-            )
-        else:
-            await callback.message.answer_video(
-                types.FSInputFile(file_path),
-                caption=final_caption
-            )
+        
+        send_start = time.time()
+        log(f"[SEND START] user={user_id} path={file_path}")
+        await send_media_with_retry(
+            callback=callback,
+            user_id=user_id,
+            file_path=file_path,
+            mode=mode,
+            title=title,
+            uploader=uploader,
+            caption=final_caption,
+            t=t
+        ) 
 
         send_time = time.time() - send_start
         log(f"[SEND DONE] user={user_id} time={send_time:.2f}s")

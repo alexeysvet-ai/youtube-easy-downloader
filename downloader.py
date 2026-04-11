@@ -9,7 +9,9 @@ from config import YOUTUBE_TEST_VIDEO_URL  # [ADD]
 from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE
 from proxy import get_active_proxies, record_success, record_fail, proxy_score, add_to_blacklist
 from bot_core.utils import log
+from format_logger import log_available_formats
 from queue import Empty
+import os
 
 
 # === NEW: proxy block detection (P0 FIX) ===
@@ -49,8 +51,22 @@ def ytdlp_worker(q, url, ydl_opts):
             print("[WORKER] before extract_info")
             info = ydl.extract_info(url, download=True)
             print("[WORKER] after extract_info")
+            if info:
+                log(
+                    f"[SELECTED FORMAT] id={info.get('format_id')} "
+                    f"ext={info.get('ext')} "
+                    f"height={info.get('height')} "
+                    f"vcodec={info.get('vcodec')} "
+                    f"acodec={info.get('acodec')} "
+                    f"filesize={info.get('filesize')}"
+                )
 
             filename = ydl.prepare_filename(info)
+
+            if not os.path.exists(filename):
+                size = info.get("filesize") or info.get("filesize_approx") or MAX_FILE_SIZE
+                q.put((None, None, f"File too big: {size}"))
+                return
             print(f"[WORKER] prepared filename={filename}")
 
             print("[WORKER] before q.put success")
@@ -95,6 +111,7 @@ def build_ydl_opts(mode: str, unique_id: str, proxy: str | None = None, download
     if download:
         ydl_opts["outtmpl"] = f"/tmp/{unique_id}_%(id)s.%(ext)s"
         ydl_opts["retries"] = 0
+        ydl_opts["max_filesize"] = MAX_FILE_SIZE
     else:
         ydl_opts["quiet"] = True
         ydl_opts["no_warnings"] = True
@@ -110,12 +127,13 @@ def precheck_size(url: str, mode: str, proxy: str | None = None) -> None:
 
     with yt_dlp.YoutubeDL(ydl_opts_check) as ydl:
         info_check = ydl.extract_info(url, download=False)
+        log_available_formats(info_check)
 
     size = info_check.get("filesize") or info_check.get("filesize_approx")
 
-    if size and size > MAX_FILE_SIZE:
+    # Используем только точный размер; если он неизвестен — не блокируем скачивание
+    if size is not None and size > MAX_FILE_SIZE:
         raise Exception(f"File too big: {size}")
-
 
 def run_download_attempt(url: str, mode: str, proxy: str | None, unique_id: str):
     ydl_opts = build_ydl_opts(mode, unique_id=unique_id, proxy=proxy, download=True)
@@ -166,6 +184,9 @@ def run_download_attempt(url: str, mode: str, proxy: str | None, unique_id: str)
     log(f"[PARENT] err is {'set' if err else 'empty'}")
 
     if err:
+        err_lower = err.lower()
+        if "max-filesize" in err_lower or "larger than max-filesize" in err_lower:
+            raise Exception(f"File too big: {MAX_FILE_SIZE}")
         raise Exception(err)
 
     return filename, info
