@@ -114,5 +114,15 @@ TEXTS = {
 "access_denied": {
     "ru": "⛔ У вас нет доступа к этому боту",
     "en": "⛔ You do not have access to this bot"
+},
+# --- Retry отправки файла ---
+"send_retry": {
+    "ru": "⚠️ Возникли проблемы с отправкой файла. Пробую ещё раз...",
+    "en": "⚠️ There was a problem sending the file. Retrying..."
+},
+
+"send_retry_final_fail": {
+    "ru": "😔 Не удалось отправить файл из-за сетевой ошибки.\n\nПопробуйте ещё раз позже.",
+    "en": "😔 Failed to send the file due to a network error.\n\nPlease try again later."
 }
 }
