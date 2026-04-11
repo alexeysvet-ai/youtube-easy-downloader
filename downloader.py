@@ -9,6 +9,7 @@ from config import YOUTUBE_TEST_VIDEO_URL  # [ADD]
 from config import DOWNLOAD_TIMEOUT, MAX_FILE_SIZE
 from proxy import get_active_proxies, record_success, record_fail, proxy_score, add_to_blacklist
 from bot_core.utils import log
+from format_logger import log_available_formats
 from queue import Empty
 
 
@@ -110,6 +111,7 @@ def precheck_size(url: str, mode: str, proxy: str | None = None) -> None:
 
     with yt_dlp.YoutubeDL(ydl_opts_check) as ydl:
         info_check = ydl.extract_info(url, download=False)
+        log_available_formats(info_check)
 
     size = info_check.get("filesize") or info_check.get("filesize_approx")
 
