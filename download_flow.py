@@ -98,7 +98,7 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
             title=title,
             uploader=uploader,
             caption=final_caption,
-            t=t
+            retry_text=t("send_retry", user_id)
         ) 
 
         send_time = time.time() - send_start
