@@ -1,4 +1,4 @@
-from aiohttp import web, ClientSession, ClientTimeout
+from aiohttp import web, ClientTimeout
 from aiogram import Bot, Dispatcher, types
 import asyncio
 from config import TELEGRAM_TIMEOUT, TOKEN, WEBHOOK_PATH, WEBHOOK_URL, PORT
@@ -11,16 +11,12 @@ if not TOKEN:
     raise ValueError("TOKEN not set")
 
 timeout = ClientTimeout(
-    total=TELEGRAM_TIMEOUT,
-    sock_read=TELEGRAM_TIMEOUT / 1.5
+    total=TELEGRAM_TIMEOUT,  # Общий таймаут запроса
+    sock_read=TELEGRAM_TIMEOUT/1.5  # Время ожидания ответа от Telegram
 )
+bot = Bot(token=TOKEN, timeout=timeout)
 
-session = ClientSession(timeout=timeout)
 
-bot = Bot(
-    token=TOKEN,
-    session=session
-)
 dp = Dispatcher()
 
 register_handlers(dp)

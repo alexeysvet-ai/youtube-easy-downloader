@@ -2,4 +2,4 @@ aiogram
 aiohttp
 yt-dlp
 requests
-git+https://github.com/alexeysvet-ai/bot-core-lib.git@v0.7.5
+git+https://github.com/alexeysvet-ai/bot-core-lib.git@v0.7.6
