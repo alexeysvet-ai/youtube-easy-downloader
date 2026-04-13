@@ -128,12 +128,30 @@ def register_handlers(dp: Dispatcher):
     @dp.callback_query(lambda c: c.data.startswith("q_"))
     async def handle_quality(callback: types.CallbackQuery):
         user_id = callback.from_user.id
-        url = user_requests.get(user_id)
+        chat_id = callback.message.chat.id if callback.message else user_id
         mode = callback.data.split("_")[1]
+        flow_id = f"{user_id}-{callback.id}"
+
+        if not hasattr(handle_quality, "_active_download_chats"):
+            handle_quality._active_download_chats = set()
+
+        active_download_chats = handle_quality._active_download_chats
+
+        if chat_id in active_download_chats:
+            log(f"[FLOW SKIP ACTIVE] flow_id={flow_id} user={user_id} chat_id={chat_id} mode={mode}")
+            await callback.answer()
+            await callback.message.answer(t("send_retry", user_id))
+            return
+
+        url = user_requests.pop(user_id, None)
 
         if not url:
+            await callback.answer()
             await callback.message.answer(t("expired_request", user_id))
             return
+
+        active_download_chats.add(chat_id)
+        log(f"[FLOW CLAIM] flow_id={flow_id} user={user_id} chat_id={chat_id} mode={mode}")
 
         await callback.answer()
 
@@ -146,18 +164,29 @@ def register_handlers(dp: Dispatcher):
                 mode=mode
             )
         except Exception as e:
-            log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_mode_selected mode={mode} error={e}")
+            log(f"[DB EVENT ERROR] user_id={user_id} event_type=download_mode_selected mode={mode} error={e}")
 
-        # === CHANGE START ===
         now = datetime.now(timezone.utc)
         msg_time = callback.message.date if callback.message else now
-
         lag_sec = (now - msg_time).total_seconds()
 
         if lag_sec > 10:
             await callback.message.answer(t("lag_long", user_id))
-        # === CHANGE END ===
 
-        asyncio.create_task(process_download(callback, user_id, url, mode, t, safe_download, download_semaphore, user_requests))
+        asyncio.create_task(
+            process_download(
+                callback,
+                user_id,
+                url,
+                mode,
+                t,
+                safe_download,
+                download_semaphore,
+                user_requests,
+                chat_id=chat_id,
+                active_download_chats=active_download_chats,
+                flow_id=flow_id,
+            )
+        )
 
 
