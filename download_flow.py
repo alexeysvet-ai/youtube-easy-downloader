@@ -13,7 +13,23 @@ from bot_core.media import send_media_with_retry
 
 # ===================== PROCESS =====================
 
-async def process_download(callback, user_id, url, mode, t, safe_download, semaphore, user_requests):
+async def process_download(
+    callback,
+    user_id,
+    url,
+    mode,
+    t,
+    safe_download,
+    semaphore,
+    user_requests,
+    chat_id=None,
+    active_download_chats=None,
+    flow_id=None,
+):
+    if flow_id is None:
+        flow_id = f"{user_id}-{int(time.time() * 1000)}"
+
+    log(f"[FLOW START] flow_id={flow_id} user={user_id} chat_id={chat_id} mode={mode}")
 
     try:
         insert_bot_event(
@@ -24,7 +40,7 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
             mode=mode
         )
     except Exception as e:
-        log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_started mode={mode} error={e}")
+        log(f"[DB EVENT ERROR] user_id={user_id} event_type=download_started mode={mode} error={e}")
 
     await callback.message.answer(t("start", user_id))
     await asyncio.sleep(2)
@@ -86,10 +102,8 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
 
 
         send_start = time.time()
-        log(f"[SEND START] user={user_id} path={file_path}")
-        
-        send_start = time.time()
-        log(f"[SEND START] user={user_id} path={file_path}")
+        log(f"[SEND START] flow_id={flow_id} user={user_id} chat_id={chat_id} path={file_path}")
+
         await send_media_with_retry(
             callback=callback,
             user_id=user_id,
@@ -99,10 +113,10 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
             uploader=uploader,
             caption=final_caption,
             retry_text=t("send_retry", user_id)
-        ) 
+        )
 
         send_time = time.time() - send_start
-        log(f"[SEND DONE] user={user_id} time={send_time:.2f}s")
+        log(f"[SEND DONE] flow_id={flow_id} user={user_id} chat_id={chat_id} time={send_time:.2f}s")
 
         try:
             insert_bot_event(
@@ -114,10 +128,10 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
                 file_size_bytes=size
             )
         except Exception as e:
-            log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_success mode={mode} error={e}")
+            log(f"[DB EVENT ERROR] user_id={user_id} event_type=download_success mode={mode} error={e}")
 
     except Exception as e:
-        log(f"[FINAL ERROR] {e}")
+        log(f"[FINAL ERROR] flow_id={flow_id} user={user_id} chat_id={chat_id} error={e}")
 
         if "File too big" in str(e):
             try:
@@ -129,7 +143,7 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
                     mode=mode
                 )
             except Exception as db_error:
-                log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_rejected_too_big mode={mode} error={db_error}")
+                log(f"[DB EVENT ERROR] user_id={user_id} event_type=download_rejected_too_big mode={mode} error={db_error}")
 
             await callback.message.answer(t("too_big", user_id))
             return
@@ -144,16 +158,19 @@ async def process_download(callback, user_id, url, mode, t, safe_download, semap
                 error_text_short=str(e)[:500]
             )
         except Exception as db_error:
-            log(f"[DB EVENT ERROR] bot_code={BOT_CODE} user_id={user_id} event_type=download_failed mode={mode} error={db_error}")
+            log(f"[DB EVENT ERROR] user_id={user_id} event_type=download_failed mode={mode} error={db_error}")
 
         await callback.message.answer(t("error", user_id))
         alert_text = build_download_fail_alert(BOT_CODE, user_id, url, mode, str(e))
         await send_alert(TOKEN, ALERT_CHANNEL_ID, alert_text)
 
-
     finally:
+        if active_download_chats is not None and chat_id is not None:
+            active_download_chats.discard(chat_id)
+            log(f"[FLOW RELEASE] flow_id={flow_id} user={user_id} chat_id={chat_id}")
+
         if file_path and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except Exception as e:
-                log(f"[CLEANUP ERROR] {e}")
+                log(f"[CLEANUP ERROR] flow_id={flow_id} user={user_id} chat_id={chat_id} error={e}")
